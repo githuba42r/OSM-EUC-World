@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Battery status colors -->
+    <color name="battery_good">#4CAF50</color>
+    <color name="battery_medium">#FFEB3B</color>
+    <color name="battery_low">#FF9800</color>
+    <color name="battery_critical">#F44336</color>
+    
+    <!-- Connection status colors -->
+    <color name="status_connected">#4CAF50</color>
+    <color name="status_connecting">#FF9800</color>
+    <color name="status_disconnected">#9E9E9E</color>
+    
+    <!-- Text colors -->
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#B0B0B0</color>
+    <color name="text_disabled">#606060</color>
+    
+    <!-- Background colors -->
+    <color name="background_dark">#1A1A1A</color>
+    <color name="background_card">#2D2D2D</color>
+    <color name="background_surface">#121212</color>
+    
+    <!-- Widget colors -->
+    <color name="widget_background">#CC000000</color>
+    <color name="widget_text">#FFFFFF</color>
+    
+    <!-- Accent colors -->
+    <color name="colorPrimary">#2196F3</color>
+    <color name="colorPrimaryDark">#1976D2</color>
+    <color name="colorAccent">#03DAC5</color>
+</resources>

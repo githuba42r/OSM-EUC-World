@@ -1,0 +1,78 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+// Load version from version.properties
+def versionPropsFile = rootProject.file('version.properties')
+def versionProps = new Properties()
+if (versionPropsFile.exists()) {
+    versionProps.load(new FileInputStream(versionPropsFile))
+}
+
+def versionMajor = (versionProps['VERSION_MAJOR'] ?: '1').toInteger()
+def versionMinor = (versionProps['VERSION_MINOR'] ?: '0').toInteger()
+def versionPatch = (versionProps['VERSION_PATCH'] ?: '0').toInteger()
+def versionCodeNum = (versionProps['VERSION_CODE'] ?: '1').toInteger()
+
+android {
+    namespace 'com.a42r.eucosmandplugin'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.a42r.eucosmandplugin"
+        minSdk 26
+        targetSdk 34
+        versionCode versionCodeNum
+        versionName "${versionMajor}.${versionMinor}.${versionPatch}"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    buildFeatures {
+        viewBinding true
+        aidl true
+    }
+}
+
+dependencies {
+    // AndroidX
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.11.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.7.0'
+    implementation 'androidx.lifecycle:lifecycle-service:2.7.0'
+    implementation 'androidx.preference:preference-ktx:1.2.1'
+    
+    // Coroutines
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+    
+    // Networking
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'com.google.code.gson:gson:2.10.1'
+    
+    // Android Auto
+    implementation 'androidx.car.app:app:1.4.0'
+    
+    // Testing
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+}

@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Permissions -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    
+    <!-- Android Auto uses feature -->
+    <uses-feature
+        android:name="android.hardware.type.automotive"
+        android:required="false" />
+
+    <!-- Package visibility for OsmAnd detection (required Android 11+) -->
+    <queries>
+        <package android:name="net.osmand" />
+        <package android:name="net.osmand.plus" />
+        <package android:name="net.osmand.dev" />
+    </queries>
+
+    <application
+        android:name=".EucWorldApplication"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.OsmAndEUCWorld"
+        tools:targetApi="34">
+
+        <!-- Main Activity -->
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.OsmAndEUCWorld">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Settings Activity -->
+        <activity
+            android:name=".ui.SettingsActivity"
+            android:exported="false"
+            android:label="@string/settings"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <!-- EUC World Data Service -->
+        <service
+            android:name=".service.EucWorldService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- OsmAnd AIDL Connection Service -->
+        <service
+            android:name=".service.OsmAndConnectionService"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.a42r.eucosmandplugin.OSMAND_CONNECTION" />
+            </intent-filter>
+        </service>
+
+        <!-- Android Auto Car App Service -->
+        <service
+            android:name=".auto.EucWorldCarAppService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.car.app.CarAppService" />
+                <category android:name="androidx.car.app.category.IOT" />
+            </intent-filter>
+        </service>
+
+        <!-- Boot Receiver to start service on device boot -->
+        <receiver
+            android:name=".receiver.BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Android Auto Proxy Receiver - handles IPC between Car App and Phone -->
+        <receiver
+            android:name=".service.AutoProxyReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.a42r.eucosmandplugin.auto.REQUEST_DATA" />
+                <action android:name="com.a42r.eucosmandplugin.auto.SUBSCRIBE" />
+                <action android:name="com.a42r.eucosmandplugin.auto.UNSUBSCRIBE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Widget Provider for OsmAnd -->
+        <receiver
+            android:name=".widget.EucBatteryWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/euc_battery_widget_info" />
+        </receiver>
+
+        <!-- Android Auto Metadata -->
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+            
+        <!-- OsmAnd Plugin Metadata -->
+        <meta-data
+            android:name="net.osmand.plugin.id"
+            android:value="com.a42r.eucosmandplugin" />
+        <meta-data
+            android:name="net.osmand.plugin.name"
+            android:value="@string/app_name" />
+        <meta-data
+            android:name="net.osmand.plugin.description"
+            android:value="@string/plugin_description" />
+
+    </application>
+
+</manifest>

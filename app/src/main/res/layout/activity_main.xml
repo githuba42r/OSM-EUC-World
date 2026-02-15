@@ -1,0 +1,409 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_dark"
+    tools:context=".ui.MainActivity">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="@color/background_surface"
+            app:title="@string/app_name"
+            app:titleTextColor="@color/text_primary" />
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="8dp"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+        <!-- Main Battery Display - HUD Style -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="6dp"
+            style="@style/CardStyle">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <!-- Line 1: Wheel Name/Model and Serial ID -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="4dp">
+
+                    <!-- Wheel Brand + Model (left) -->
+                    <TextView
+                        android:id="@+id/tvWheelName"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/not_connected"
+                        android:gravity="start"
+                        style="@style/TextStyle.WheelName" />
+
+                    <!-- Connection Status (right) -->
+                    <TextView
+                        android:id="@+id/tvConnectionStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/status_disconnected"
+                        android:gravity="end"
+                        style="@style/TextStyle.WheelSerial" />
+
+                </LinearLayout>
+
+                <!-- Battery % - Large HUD Display (centered) -->
+                <TextView
+                    android:id="@+id/tvBatteryPercent"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="--"
+                    android:gravity="center"
+                    style="@style/TextStyle.Battery" />
+
+                <!-- Voltage (centered, below battery) -->
+                <TextView
+                    android:id="@+id/tvVoltage"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="---"
+                    android:gravity="center"
+                    style="@style/TextStyle.Voltage" />
+
+            </LinearLayout>
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- Metrics Grid -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="6dp"
+            style="@style/CardStyle">
+
+            <GridLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:columnCount="4"
+                android:padding="8dp">
+
+                <!-- Speed -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_columnWeight="1"
+                    android:orientation="vertical"
+                    android:gravity="center">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/speed"
+                        style="@style/TextStyle.Label" />
+
+                    <TextView
+                        android:id="@+id/tvSpeed"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="--"
+                        style="@style/TextStyle.MetricValue" />
+
+                </LinearLayout>
+
+                <!-- Temperature -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_columnWeight="1"
+                    android:orientation="vertical"
+                    android:gravity="center">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/temperature"
+                        style="@style/TextStyle.Label" />
+
+                    <TextView
+                        android:id="@+id/tvTemperature"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="--"
+                        style="@style/TextStyle.MetricValue" />
+
+                </LinearLayout>
+
+                <!-- Power -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_columnWeight="1"
+                    android:orientation="vertical"
+                    android:gravity="center">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/power"
+                        style="@style/TextStyle.Label" />
+
+                    <TextView
+                        android:id="@+id/tvPower"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="--"
+                        style="@style/TextStyle.MetricValue" />
+
+                </LinearLayout>
+
+                <!-- Load/PWM -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_columnWeight="1"
+                    android:orientation="vertical"
+                    android:gravity="center">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/load"
+                        style="@style/TextStyle.Label" />
+
+                    <TextView
+                        android:id="@+id/tvLoad"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="--"
+                        style="@style/TextStyle.MetricValue" />
+
+                </LinearLayout>
+
+            </GridLayout>
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- Distance Info -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="6dp"
+            style="@style/CardStyle">
+
+            <GridLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:columnCount="2"
+                android:padding="8dp">
+
+                <!-- Wheel Trip Distance -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_columnWeight="1"
+                    android:orientation="vertical"
+                    android:gravity="center">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/wheel_trip"
+                        style="@style/TextStyle.Label" />
+
+                    <TextView
+                        android:id="@+id/tvTripDistance"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="-- km"
+                        style="@style/TextStyle.MetricValue" />
+
+                </LinearLayout>
+
+                <!-- Total Distance -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_columnWeight="1"
+                    android:orientation="vertical"
+                    android:gravity="center">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/total_distance"
+                        style="@style/TextStyle.Label" />
+
+                    <TextView
+                        android:id="@+id/tvTotalDistance"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="-- km"
+                        style="@style/TextStyle.MetricValue" />
+
+                </LinearLayout>
+
+            </GridLayout>
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- App Trip Meters (A/B/C) -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="6dp"
+            style="@style/CardStyle">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="8dp">
+
+                <!-- Header with dropdown and buttons -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/app_trip_meters"
+                        android:layout_marginEnd="4dp"
+                        style="@style/TextStyle.Label" />
+
+                    <Spinner
+                        android:id="@+id/spinnerTripSelect"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_weight="1" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnResetTrip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="32dp"
+                        android:text="@string/reset"
+                        android:textSize="10sp"
+                        android:minWidth="0dp"
+                        android:paddingStart="8dp"
+                        android:paddingEnd="8dp"
+                        style="@style/Widget.MaterialComponents.Button.TextButton" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnClearAllTrips"
+                        android:layout_width="wrap_content"
+                        android:layout_height="32dp"
+                        android:text="@string/clear_all"
+                        android:textSize="10sp"
+                        android:minWidth="0dp"
+                        android:paddingStart="8dp"
+                        android:paddingEnd="8dp"
+                        style="@style/Widget.MaterialComponents.Button.TextButton" />
+
+                </LinearLayout>
+
+                <!-- Trip A/B/C values in a row -->
+                <GridLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:columnCount="3"
+                    android:layout_marginTop="4dp">
+
+                    <!-- Trip A -->
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_columnWeight="1"
+                        android:orientation="vertical"
+                        android:gravity="center">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/trip_a"
+                            style="@style/TextStyle.Label" />
+
+                        <TextView
+                            android:id="@+id/tvTripA"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="--"
+                            style="@style/TextStyle.MetricValue" />
+
+                    </LinearLayout>
+
+                    <!-- Trip B -->
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_columnWeight="1"
+                        android:orientation="vertical"
+                        android:gravity="center">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/trip_b"
+                            style="@style/TextStyle.Label" />
+
+                        <TextView
+                            android:id="@+id/tvTripB"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="--"
+                            style="@style/TextStyle.MetricValue" />
+
+                    </LinearLayout>
+
+                    <!-- Trip C -->
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_columnWeight="1"
+                        android:orientation="vertical"
+                        android:gravity="center">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/trip_c"
+                            style="@style/TextStyle.Label" />
+
+                        <TextView
+                            android:id="@+id/tvTripC"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="--"
+                            style="@style/TextStyle.MetricValue" />
+
+                    </LinearLayout>
+
+                </GridLayout>
+
+            </LinearLayout>
+
+        </androidx.cardview.widget.CardView>
+
+    </LinearLayout>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>
