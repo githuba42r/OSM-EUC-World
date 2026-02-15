@@ -155,6 +155,11 @@ class EucWorldService : LifecycleService() {
                     _connectionState.value = ConnectionState.ERROR
                     _eucDataState.value = null
                     _latestData = null
+                    
+                    // Clear OsmAnd widgets when EUC World is not available
+                    if (osmAndHelper.isConnected()) {
+                        osmAndHelper.clearWidgets()
+                    }
                 }
                 .collectLatest { result ->
                     result.fold(
@@ -177,6 +182,11 @@ class EucWorldService : LifecycleService() {
                             _connectionState.value = ConnectionState.ERROR
                             _eucDataState.value = null
                             _latestData = null
+                            
+                            // Clear OsmAnd widgets when EUC World is not available
+                            if (osmAndHelper.isConnected()) {
+                                osmAndHelper.clearWidgets()
+                            }
                         }
                     )
                 }

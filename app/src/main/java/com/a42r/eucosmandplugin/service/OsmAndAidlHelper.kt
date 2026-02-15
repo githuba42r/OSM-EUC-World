@@ -393,46 +393,43 @@ class OsmAndAidlHelper(private val context: Context) {
     }
     
     /**
-     * Update widgets to show disconnected state.
+     * Clear all widget content when EUC World is not available.
+     * Widgets will show no text/output.
      */
-    fun updateWidgetDisconnected() {
+    fun clearWidgets() {
         val aidl = osmAndInterface ?: return
         
         try {
-            // Combined battery + voltage
+            // Clear all widgets by setting empty text
             updateWidget(aidl,
                 WIDGET_ID_BATTERY,
                 "EUC Battery & Voltage",
-                "--%",
-                "--V",
+                "",
+                "",
                 WIDGET_ORDER_BATTERY
             )
             
-            // Battery percent
             updateWidget(aidl,
                 WIDGET_ID_BATTERY_PERCENT,
                 "EUC Battery %",
-                "--%",
-                "EUC",
+                "",
+                "",
                 WIDGET_ORDER_BATTERY_PERCENT
             )
             
-            // Voltage
             updateWidget(aidl,
                 WIDGET_ID_VOLTAGE,
                 "EUC Voltage",
-                "--V",
-                "EUC",
+                "",
+                "",
                 WIDGET_ORDER_VOLTAGE
             )
             
-            // Trip meters keep their values (they persist)
-            // But show -- if no odometer data
             updateWidget(aidl,
                 WIDGET_ID_TRIP_A,
                 "EUC Trip A",
-                "-- km",
-                "Trip A",
+                "",
+                "",
                 WIDGET_ORDER_TRIP_A,
                 "ic_action_distance"
             )
@@ -440,8 +437,8 @@ class OsmAndAidlHelper(private val context: Context) {
             updateWidget(aidl,
                 WIDGET_ID_TRIP_B,
                 "EUC Trip B",
-                "-- km",
-                "Trip B",
+                "",
+                "",
                 WIDGET_ORDER_TRIP_B,
                 "ic_action_distance"
             )
@@ -449,14 +446,16 @@ class OsmAndAidlHelper(private val context: Context) {
             updateWidget(aidl,
                 WIDGET_ID_TRIP_C,
                 "EUC Trip C",
-                "-- km",
-                "Trip C",
+                "",
+                "",
                 WIDGET_ORDER_TRIP_C,
                 "ic_action_distance"
             )
             
+            Log.d(TAG, "Cleared all widget content")
+            
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to update widgets (disconnected): ${e.message}")
+            Log.e(TAG, "Failed to clear widgets: ${e.message}")
         }
     }
     
