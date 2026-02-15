@@ -74,6 +74,14 @@ class AutoProxyReceiver : BroadcastReceiver() {
         const val EXTRA_TIMESTAMP = "timestamp"
         const val EXTRA_CONNECTION_STATE = "connection_state"
         
+        // App trip meter data
+        const val EXTRA_TRIP_A = "trip_a"
+        const val EXTRA_TRIP_B = "trip_b"
+        const val EXTRA_TRIP_C = "trip_c"
+        const val EXTRA_TRIP_A_ACTIVE = "trip_a_active"
+        const val EXTRA_TRIP_B_ACTIVE = "trip_b_active"
+        const val EXTRA_TRIP_C_ACTIVE = "trip_c_active"
+        
         /**
          * Create an intent filter for the Car App to receive data updates
          */

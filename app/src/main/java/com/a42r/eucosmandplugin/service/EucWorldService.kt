@@ -26,6 +26,7 @@ import com.a42r.eucosmandplugin.api.EucData
 import com.a42r.eucosmandplugin.api.EucWidgetData
 import com.a42r.eucosmandplugin.api.EucWorldApiClient
 import com.a42r.eucosmandplugin.ui.MainActivity
+import com.a42r.eucosmandplugin.util.TripMeterManager
 
 /**
  * Foreground service that continuously polls the EUC World Internal Webservice API
@@ -87,6 +88,9 @@ class EucWorldService : LifecycleService() {
     // OsmAnd AIDL helper for widget integration
     private lateinit var osmAndHelper: OsmAndAidlHelper
     
+    // Trip meter manager for app trips
+    private lateinit var tripMeterManager: TripMeterManager
+    
     inner class LocalBinder : Binder() {
         fun getService(): EucWorldService = this@EucWorldService
     }
@@ -98,6 +102,9 @@ class EucWorldService : LifecycleService() {
         
         // Initialize OsmAnd AIDL helper
         osmAndHelper = OsmAndAidlHelper(this)
+        
+        // Initialize trip meter manager
+        tripMeterManager = TripMeterManager(this)
     }
     
     override fun onBind(intent: Intent): IBinder {
@@ -227,9 +234,19 @@ class EucWorldService : LifecycleService() {
     private fun broadcastToAndroidAuto(data: EucData) {
         val autoPrefs = getSharedPreferences("auto_proxy", Context.MODE_PRIVATE)
         if (autoPrefs.getBoolean("auto_subscribed", false)) {
+            // Get trip distances
+            val (tripA, tripB, tripC) = tripMeterManager.getAllTripDistances(data.totalDistance)
+            
             val intent = Intent(AutoProxyReceiver.ACTION_EUC_DATA_UPDATE).apply {
                 setPackage(packageName)
                 putExtras(AutoProxyReceiver.createDataBundle(data))
+                // Add trip data
+                putExtra(AutoProxyReceiver.EXTRA_TRIP_A, tripA ?: -1.0)
+                putExtra(AutoProxyReceiver.EXTRA_TRIP_B, tripB ?: -1.0)
+                putExtra(AutoProxyReceiver.EXTRA_TRIP_C, tripC ?: -1.0)
+                putExtra(AutoProxyReceiver.EXTRA_TRIP_A_ACTIVE, tripMeterManager.isTripActive(TripMeterManager.TripMeter.A))
+                putExtra(AutoProxyReceiver.EXTRA_TRIP_B_ACTIVE, tripMeterManager.isTripActive(TripMeterManager.TripMeter.B))
+                putExtra(AutoProxyReceiver.EXTRA_TRIP_C_ACTIVE, tripMeterManager.isTripActive(TripMeterManager.TripMeter.C))
             }
             sendBroadcast(intent)
         }
