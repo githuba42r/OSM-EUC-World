@@ -74,8 +74,7 @@ class OsmAndAidlHelper(private val context: Context) {
             isBound = true
             _connectionState.value = OsmAndConnectionState.CONNECTED
             
-            // First remove any stale widget, then register fresh
-            removeWidgets()
+            // Register widgets (addMapWidget will update if already exists)
             registerWidgets()
         }
         
@@ -121,11 +120,13 @@ class OsmAndAidlHelper(private val context: Context) {
     
     /**
      * Disconnect from OsmAnd's AIDL service.
+     * Widgets are NOT removed - they persist in OsmAnd's widget list.
+     * Content is cleared to show NC (Not Connected).
      */
     fun disconnect() {
         if (isBound) {
-            // Remove widgets before disconnecting
-            removeWidgets()
+            // Clear widget content but don't remove them from OsmAnd
+            clearWidgets()
             
             try {
                 context.unbindService(serviceConnection)
