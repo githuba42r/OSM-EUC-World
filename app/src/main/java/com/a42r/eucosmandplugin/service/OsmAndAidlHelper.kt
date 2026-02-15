@@ -394,42 +394,42 @@ class OsmAndAidlHelper(private val context: Context) {
     
     /**
      * Clear all widget content when EUC World is not available.
-     * Widgets will show no text/output.
+     * Widgets will show "NC" (Not Connected).
      */
     fun clearWidgets() {
         val aidl = osmAndInterface ?: return
         
         try {
-            // Clear all widgets by setting empty text
+            // Clear all widgets by setting NC text
             updateWidget(aidl,
                 WIDGET_ID_BATTERY,
                 "EUC Battery & Voltage",
-                "",
-                "",
+                "NC",
+                "Not Connected",
                 WIDGET_ORDER_BATTERY
             )
             
             updateWidget(aidl,
                 WIDGET_ID_BATTERY_PERCENT,
                 "EUC Battery %",
-                "",
-                "",
+                "NC",
+                "Not Connected",
                 WIDGET_ORDER_BATTERY_PERCENT
             )
             
             updateWidget(aidl,
                 WIDGET_ID_VOLTAGE,
                 "EUC Voltage",
-                "",
-                "",
+                "NC",
+                "Not Connected",
                 WIDGET_ORDER_VOLTAGE
             )
             
             updateWidget(aidl,
                 WIDGET_ID_TRIP_A,
                 "EUC Trip A",
-                "",
-                "",
+                "NC",
+                "Not Connected",
                 WIDGET_ORDER_TRIP_A,
                 "ic_action_distance"
             )
@@ -437,8 +437,8 @@ class OsmAndAidlHelper(private val context: Context) {
             updateWidget(aidl,
                 WIDGET_ID_TRIP_B,
                 "EUC Trip B",
-                "",
-                "",
+                "NC",
+                "Not Connected",
                 WIDGET_ORDER_TRIP_B,
                 "ic_action_distance"
             )
@@ -446,13 +446,13 @@ class OsmAndAidlHelper(private val context: Context) {
             updateWidget(aidl,
                 WIDGET_ID_TRIP_C,
                 "EUC Trip C",
-                "",
-                "",
+                "NC",
+                "Not Connected",
                 WIDGET_ORDER_TRIP_C,
                 "ic_action_distance"
             )
             
-            Log.d(TAG, "Cleared all widget content")
+            Log.d(TAG, "Cleared all widget content (NC)")
             
         } catch (e: Exception) {
             Log.e(TAG, "Failed to clear widgets: ${e.message}")
