@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Android Auto configuration -->
-<automotiveApp xmlns:android="http://schemas.android.com/apk/res/android">
+<!-- Android Auto configuration for EUC World app -->
+<automotiveApp>
     <uses name="template" />
 </automotiveApp>

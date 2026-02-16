@@ -3,7 +3,6 @@ package com.a42r.eucosmandplugin.auto
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.os.Build
 import android.util.Log
 import androidx.car.app.CarContext
@@ -18,26 +17,7 @@ import com.a42r.eucosmandplugin.service.ConnectionState
 /**
  * Quick-glance screen for Android Auto showing EUC battery status.
  * 
- * Design: Simple, large text optimized for quick glances while driving.
- * 
- * Layout:
- * ┌─────────────────────────────────┐
- * │           EUC World             │
- * │                                 │
- * │             85%                 │  <- Large battery percentage
- * │            84.2V                │  <- Voltage
- * │                                 │
- * │   Trip A: 12.3 km               │  <- Only shown if active
- * │   Trip B: 5.7 km                │  <- Only shown if active
- * └─────────────────────────────────┘
- * 
- * When disconnected:
- * ┌─────────────────────────────────┐
- * │           EUC World             │
- * │                                 │
- * │              NC                 │  <- Not Connected
- * │                                 │
- * └─────────────────────────────────┘
+ * Uses MessageTemplate for maximum compatibility with all Android Auto hosts.
  */
 class EucWorldScreen(carContext: CarContext) : Screen(carContext) {
     
@@ -134,6 +114,8 @@ class EucWorldScreen(carContext: CarContext) : Screen(carContext) {
     }
     
     override fun onGetTemplate(): Template {
+        Log.d(TAG, "onGetTemplate called, connectionState=$connectionState, eucData=$eucData")
+        
         val data = eucData
         
         return if (data != null && connectionState == ConnectionState.CONNECTED) {
@@ -147,48 +129,30 @@ class EucWorldScreen(carContext: CarContext) : Screen(carContext) {
      * Create the connected template with battery, voltage, and active trips
      */
     private fun createConnectedTemplate(data: EucData): Template {
-        val listBuilder = ItemList.Builder()
+        // Build the message text
+        val messageBuilder = StringBuilder()
+        messageBuilder.append("${data.batteryPercentage}%  •  ${String.format("%.1fV", data.voltage)}")
         
-        // Row 1: Large battery percentage
-        listBuilder.addItem(
-            Row.Builder()
-                .setTitle("${data.batteryPercentage}%")
-                .addText(String.format("%.1fV", data.voltage))
-                .build()
-        )
-        
-        // Add active trips only
+        // Add active trips
+        val trips = mutableListOf<String>()
         if (tripAActive && tripA != null) {
-            listBuilder.addItem(
-                Row.Builder()
-                    .setTitle("Trip A")
-                    .addText(String.format("%.1f km", tripA))
-                    .build()
-            )
+            trips.add("A: ${String.format("%.1f", tripA)} km")
         }
-        
         if (tripBActive && tripB != null) {
-            listBuilder.addItem(
-                Row.Builder()
-                    .setTitle("Trip B")
-                    .addText(String.format("%.1f km", tripB))
-                    .build()
-            )
+            trips.add("B: ${String.format("%.1f", tripB)} km")
         }
-        
         if (tripCActive && tripC != null) {
-            listBuilder.addItem(
-                Row.Builder()
-                    .setTitle("Trip C")
-                    .addText(String.format("%.1f km", tripC))
-                    .build()
-            )
+            trips.add("C: ${String.format("%.1f", tripC)} km")
         }
         
-        return ListTemplate.Builder()
+        if (trips.isNotEmpty()) {
+            messageBuilder.append("\n")
+            messageBuilder.append(trips.joinToString("  •  "))
+        }
+        
+        return MessageTemplate.Builder(messageBuilder.toString())
             .setTitle("EUC World")
             .setHeaderAction(Action.APP_ICON)
-            .setSingleList(listBuilder.build())
             .build()
     }
     
@@ -196,20 +160,9 @@ class EucWorldScreen(carContext: CarContext) : Screen(carContext) {
      * Create the disconnected template showing NC
      */
     private fun createDisconnectedTemplate(): Template {
-        val listBuilder = ItemList.Builder()
-        
-        // Show NC - Not Connected
-        listBuilder.addItem(
-            Row.Builder()
-                .setTitle("NC")
-                .addText("Not Connected")
-                .build()
-        )
-        
-        return ListTemplate.Builder()
+        return MessageTemplate.Builder("Not Connected")
             .setTitle("EUC World")
             .setHeaderAction(Action.APP_ICON)
-            .setSingleList(listBuilder.build())
             .build()
     }
 }
