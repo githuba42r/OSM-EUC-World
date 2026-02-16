@@ -54,6 +54,9 @@ class EucWorldScreen(carContext: CarContext) : Screen(carContext) {
     private var lastBatteryPercentage: Int? = null
     private var lastVoltage: Double? = null
     private var lastConnectionState: ConnectionState = ConnectionState.DISCONNECTED
+    private var lastTripA: Double? = null
+    private var lastTripB: Double? = null
+    private var lastTripC: Double? = null
     
     /**
      * Get the user-configured update interval from preferences
@@ -91,6 +94,11 @@ class EucWorldScreen(carContext: CarContext) : Screen(carContext) {
                             lastBatteryPercentage = eucData?.batteryPercentage
                             lastVoltage = eucData?.voltage
                             lastConnectionState = connectionState
+                            // Store current trip values
+                            val (tripA, tripB, tripC) = tripMeterManager.getAllTripDistances(currentOdometer)
+                            lastTripA = tripA
+                            lastTripB = tripB
+                            lastTripC = tripC
                             Log.d(TAG, "Invalidating template (data changed)")
                             invalidate()
                         }
@@ -125,6 +133,7 @@ class EucWorldScreen(carContext: CarContext) : Screen(carContext) {
      * 2. OR connection state changed
      * 3. OR battery percentage changed by 1% or more
      * 4. OR voltage changed significantly
+     * 5. OR trip meter values changed
      */
     private fun shouldInvalidate(): Boolean {
         val now = System.currentTimeMillis()
@@ -138,22 +147,33 @@ class EucWorldScreen(carContext: CarContext) : Screen(carContext) {
             
             // Allow update if battery changed
             if (currentBattery != lastBatteryPercentage) {
+                Log.d(TAG, "Battery changed: $lastBatteryPercentage -> $currentBattery")
                 return true
             }
             
             // Allow update if voltage changed by more than 0.5V
             if (currentVoltage != null && lastVoltage != null) {
                 if (Math.abs(currentVoltage - lastVoltage!!) > 0.5) {
+                    Log.d(TAG, "Voltage changed significantly: $lastVoltage -> $currentVoltage")
                     return true
                 }
             }
             
+            // Allow update if any trip meter changed
+            val (tripA, tripB, tripC) = tripMeterManager.getAllTripDistances(currentOdometer)
+            if (tripA != lastTripA || tripB != lastTripB || tripC != lastTripC) {
+                Log.d(TAG, "Trip meter changed: A=$lastTripA->$tripA, B=$lastTripB->$tripB, C=$lastTripC->$tripC")
+                return true
+            }
+            
             // Connection state is handled separately
             
+            Log.d(TAG, "Throttling update (${timeSinceLastUpdate}ms < ${minInterval}ms)")
             return false
         }
         
         // Enough time has passed
+        Log.d(TAG, "Update interval passed (${timeSinceLastUpdate}ms >= ${minInterval}ms)")
         return true
     }
     

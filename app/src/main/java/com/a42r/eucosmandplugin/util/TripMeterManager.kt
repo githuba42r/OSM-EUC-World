@@ -1,7 +1,9 @@
 package com.a42r.eucosmandplugin.util
 
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
+import android.util.Log
 
 /**
  * Manages internal trip meters (A, B, C) that calculate distance
@@ -10,9 +12,10 @@ import android.content.SharedPreferences
  * Each trip meter stores the odometer value at the time it was reset.
  * Current trip distance = current odometer - stored odometer value
  */
-class TripMeterManager(context: Context) {
+class TripMeterManager(private val context: Context) {
     
     companion object {
+        private const val TAG = "TripMeterManager"
         private const val PREFS_NAME = "trip_meters"
         private const val KEY_TRIP_A_START = "trip_a_start"
         private const val KEY_TRIP_B_START = "trip_b_start"
@@ -20,6 +23,9 @@ class TripMeterManager(context: Context) {
         
         // Special value indicating trip meter is not set
         private const val NOT_SET = -1.0
+        
+        // Broadcast action for immediate updates
+        const val ACTION_TRIP_METER_CHANGED = "com.a42r.eucosmandplugin.TRIP_METER_CHANGED"
     }
     
     enum class TripMeter {
@@ -50,6 +56,7 @@ class TripMeterManager(context: Context) {
             TripMeter.C -> KEY_TRIP_C_START
         }
         prefs.edit().putLong(key, currentOdometer.toBits()).apply()
+        notifyTripMeterChanged()
     }
     
     /**
@@ -62,6 +69,7 @@ class TripMeterManager(context: Context) {
             TripMeter.C -> KEY_TRIP_C_START
         }
         prefs.edit().putLong(key, NOT_SET.toBits()).apply()
+        notifyTripMeterChanged()
     }
     
     /**
@@ -73,6 +81,19 @@ class TripMeterManager(context: Context) {
             .putLong(KEY_TRIP_B_START, NOT_SET.toBits())
             .putLong(KEY_TRIP_C_START, NOT_SET.toBits())
             .apply()
+        notifyTripMeterChanged()
+    }
+    
+    /**
+     * Notify listeners that trip meter data has changed
+     */
+    private fun notifyTripMeterChanged() {
+        Log.d(TAG, "Broadcasting trip meter change: $ACTION_TRIP_METER_CHANGED")
+        val intent = Intent(ACTION_TRIP_METER_CHANGED).apply {
+            setPackage(context.packageName)
+        }
+        context.sendBroadcast(intent)
+        Log.d(TAG, "Broadcast sent to package: ${context.packageName}")
     }
     
     /**

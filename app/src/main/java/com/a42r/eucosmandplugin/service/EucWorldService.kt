@@ -5,12 +5,16 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import androidx.preference.PreferenceManager
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
@@ -35,6 +39,7 @@ import com.a42r.eucosmandplugin.util.TripMeterManager
 class EucWorldService : LifecycleService() {
 
     companion object {
+        private const val TAG = "EucWorldService"
         const val NOTIFICATION_CHANNEL_ID = "euc_world_channel"
         const val NOTIFICATION_CHANNEL_ID_MINIMAL = "euc_world_channel_minimal"
         const val NOTIFICATION_ID = 1001
@@ -91,6 +96,17 @@ class EucWorldService : LifecycleService() {
     // Trip meter manager for app trips
     private lateinit var tripMeterManager: TripMeterManager
     
+    // Receiver for trip meter change broadcasts
+    private val tripMeterChangeReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            Log.d(TAG, "Received broadcast: ${intent?.action}")
+            if (intent?.action == TripMeterManager.ACTION_TRIP_METER_CHANGED) {
+                Log.d(TAG, "Trip meter changed, triggering immediate broadcast")
+                triggerImmediateBroadcast()
+            }
+        }
+    }
+    
     inner class LocalBinder : Binder() {
         fun getService(): EucWorldService = this@EucWorldService
     }
@@ -105,6 +121,14 @@ class EucWorldService : LifecycleService() {
         
         // Initialize trip meter manager
         tripMeterManager = TripMeterManager(this)
+        
+        // Register receiver for trip meter changes
+        val filter = IntentFilter(TripMeterManager.ACTION_TRIP_METER_CHANGED)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(tripMeterChangeReceiver, filter, RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(tripMeterChangeReceiver, filter)
+        }
     }
     
     override fun onBind(intent: Intent): IBinder {
@@ -137,6 +161,7 @@ class EucWorldService : LifecycleService() {
     override fun onDestroy() {
         stopPolling()
         osmAndHelper.disconnect()
+        unregisterReceiver(tripMeterChangeReceiver)
         super.onDestroy()
     }
     
@@ -270,6 +295,18 @@ class EucWorldService : LifecycleService() {
      * Get the OsmAnd AIDL helper for external access
      */
     fun getOsmAndHelper(): OsmAndAidlHelper = osmAndHelper
+    
+    /**
+     * Trigger an immediate broadcast of current data to Android Auto.
+     * Use this when trip meters are reset or other immediate updates are needed.
+     */
+    fun triggerImmediateBroadcast() {
+        Log.d(TAG, "triggerImmediateBroadcast() called, current data: ${_eucDataState.value != null}")
+        _eucDataState.value?.let { data ->
+            Log.d(TAG, "Broadcasting data to Android Auto immediately")
+            broadcastToAndroidAuto(data)
+        } ?: Log.w(TAG, "No data available to broadcast")
+    }
     
     fun updateApiConfig(baseUrl: String, port: Int, pollInterval: Long) {
         getSharedPreferences("euc_world_prefs", Context.MODE_PRIVATE).edit().apply {

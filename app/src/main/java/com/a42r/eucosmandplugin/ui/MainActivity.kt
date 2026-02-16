@@ -141,6 +141,7 @@ class MainActivity : AppCompatActivity() {
             if (currentOdometer > 0) {
                 tripMeterManager.resetTrip(selectedTripMeter, currentOdometer)
                 updateTripMeters()
+                eucService?.triggerImmediateBroadcast()
             }
         }
         
@@ -148,6 +149,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnClearAllTrips.setOnClickListener {
             tripMeterManager.clearAllTrips()
             updateTripMeters()
+            eucService?.triggerImmediateBroadcast()
         }
         
         // Long click on Trip A to reset it
@@ -155,6 +157,7 @@ class MainActivity : AppCompatActivity() {
             if (currentOdometer > 0) {
                 tripMeterManager.resetTrip(TripMeterManager.TripMeter.A, currentOdometer)
                 updateTripMeters()
+                eucService?.triggerImmediateBroadcast()
             }
             true
         }
@@ -164,6 +167,7 @@ class MainActivity : AppCompatActivity() {
             if (currentOdometer > 0) {
                 tripMeterManager.resetTrip(TripMeterManager.TripMeter.B, currentOdometer)
                 updateTripMeters()
+                eucService?.triggerImmediateBroadcast()
             }
             true
         }
@@ -173,6 +177,7 @@ class MainActivity : AppCompatActivity() {
             if (currentOdometer > 0) {
                 tripMeterManager.resetTrip(TripMeterManager.TripMeter.C, currentOdometer)
                 updateTripMeters()
+                eucService?.triggerImmediateBroadcast()
             }
             true
         }
