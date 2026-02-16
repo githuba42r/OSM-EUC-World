@@ -9,6 +9,8 @@ import com.a42r.eucosmandplugin.util.TripMeterManager
 /**
  * Android Auto screen for managing trip meters.
  * Allows resetting individual trip meters or clearing all.
+ * 
+ * Uses PaneTemplate which allows actions with ParkedOnlyOnClickListener
  */
 class TripMeterScreen(
     carContext: CarContext,
@@ -25,41 +27,35 @@ class TripMeterScreen(
         
         val (tripA, tripB, tripC) = tripMeterManager.getAllTripDistances(currentOdometer)
         
-        // Build list of trip meter items (without actions - they crash)
-        val listBuilder = ItemList.Builder()
+        // Build pane with trip meter info
+        val paneBuilder = Pane.Builder()
         
-        // Trip A
-        listBuilder.addItem(
+        // Add trip meter rows
+        paneBuilder.addRow(
             Row.Builder()
                 .setTitle("Trip A")
                 .addText("${formatTripDistance(tripA)} km")
                 .build()
         )
         
-        // Trip B
-        listBuilder.addItem(
+        paneBuilder.addRow(
             Row.Builder()
                 .setTitle("Trip B")
                 .addText("${formatTripDistance(tripB)} km")
                 .build()
         )
         
-        // Trip C
-        listBuilder.addItem(
+        paneBuilder.addRow(
             Row.Builder()
                 .setTitle("Trip C")
                 .addText("${formatTripDistance(tripC)} km")
                 .build()
         )
         
-        // Build action strip with reset buttons
-        val actionStripBuilder = ActionStrip.Builder()
-        
-        // Add individual reset actions (these CAN have FLAG_PRIMARY in action strip)
-        actionStripBuilder.addAction(
+        // Add action buttons for resetting trips
+        paneBuilder.addAction(
             Action.Builder()
-                .setTitle("Reset A")
-                .setFlags(Action.FLAG_PRIMARY)
+                .setTitle("Reset Trip A")
                 .setOnClickListener(ParkedOnlyOnClickListener.create {
                     tripMeterManager.resetTrip(TripMeterManager.TripMeter.A, currentOdometer)
                     invalidate()
@@ -67,10 +63,9 @@ class TripMeterScreen(
                 .build()
         )
         
-        actionStripBuilder.addAction(
+        paneBuilder.addAction(
             Action.Builder()
-                .setTitle("Reset B")
-                .setFlags(Action.FLAG_PRIMARY)
+                .setTitle("Reset Trip B")
                 .setOnClickListener(ParkedOnlyOnClickListener.create {
                     tripMeterManager.resetTrip(TripMeterManager.TripMeter.B, currentOdometer)
                     invalidate()
@@ -78,10 +73,9 @@ class TripMeterScreen(
                 .build()
         )
         
-        actionStripBuilder.addAction(
+        paneBuilder.addAction(
             Action.Builder()
-                .setTitle("Reset C")
-                .setFlags(Action.FLAG_PRIMARY)
+                .setTitle("Reset Trip C")
                 .setOnClickListener(ParkedOnlyOnClickListener.create {
                     tripMeterManager.resetTrip(TripMeterManager.TripMeter.C, currentOdometer)
                     invalidate()
@@ -89,10 +83,9 @@ class TripMeterScreen(
                 .build()
         )
         
-        actionStripBuilder.addAction(
+        paneBuilder.addAction(
             Action.Builder()
                 .setTitle("Clear All")
-                .setFlags(Action.FLAG_PRIMARY)
                 .setOnClickListener(ParkedOnlyOnClickListener.create {
                     tripMeterManager.clearAllTrips()
                     invalidate()
@@ -100,12 +93,10 @@ class TripMeterScreen(
                 .build()
         )
         
-        // Use ListTemplate for the trip meter management screen
-        return ListTemplate.Builder()
+        // Use PaneTemplate for the trip meter management screen
+        return PaneTemplate.Builder(paneBuilder.build())
             .setTitle("Trip Meters")
             .setHeaderAction(Action.BACK)
-            .setSingleList(listBuilder.build())
-            .setActionStrip(actionStripBuilder.build())
             .build()
     }
     
