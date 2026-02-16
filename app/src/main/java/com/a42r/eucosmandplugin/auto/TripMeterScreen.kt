@@ -35,6 +35,7 @@ class TripMeterScreen(
                 .addAction(
                     Action.Builder()
                         .setTitle("Reset")
+                        .setFlags(Action.FLAG_PRIMARY)
                         .setOnClickListener(ParkedOnlyOnClickListener.create {
                             tripMeterManager.resetTrip(TripMeterManager.TripMeter.A, currentOdometer)
                             invalidate()
@@ -51,6 +52,7 @@ class TripMeterScreen(
                 .addAction(
                     Action.Builder()
                         .setTitle("Reset")
+                        .setFlags(Action.FLAG_PRIMARY)
                         .setOnClickListener(ParkedOnlyOnClickListener.create {
                             tripMeterManager.resetTrip(TripMeterManager.TripMeter.B, currentOdometer)
                             invalidate()
@@ -67,6 +69,7 @@ class TripMeterScreen(
                 .addAction(
                     Action.Builder()
                         .setTitle("Reset")
+                        .setFlags(Action.FLAG_PRIMARY)
                         .setOnClickListener(ParkedOnlyOnClickListener.create {
                             tripMeterManager.resetTrip(TripMeterManager.TripMeter.C, currentOdometer)
                             invalidate()
@@ -81,6 +84,7 @@ class TripMeterScreen(
         actionStripBuilder.addAction(
             Action.Builder()
                 .setTitle("Clear All")
+                .setFlags(Action.FLAG_PRIMARY)
                 .setOnClickListener(ParkedOnlyOnClickListener.create {
                     tripMeterManager.clearAllTrips()
                     invalidate()
