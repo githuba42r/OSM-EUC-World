@@ -7,14 +7,8 @@ import androidx.car.app.model.*
 import com.a42r.eucosmandplugin.util.TripMeterManager
 
 /**
- * Android Auto screen for managing trip meters.
- * 
- * Due to Android Auto constraints:
- * - PaneTemplate max: 2 actions
- * - ListTemplate rows: 0 actions allowed
- * - ActionStrip: Must have icons
- * 
- * Solution: Show info only, with 2 actions: Reset Selected and Clear All
+ * Android Auto screen showing list of trip meters.
+ * Tapping on a trip meter opens the detail screen.
  */
 class TripMeterScreen(
     carContext: CarContext,
@@ -31,37 +25,85 @@ class TripMeterScreen(
         
         val (tripA, tripB, tripC) = tripMeterManager.getAllTripDistances(currentOdometer)
         
-        // Build message showing all trip meters
-        val message = buildString {
-            append("Trip A: ${formatTripDistance(tripA)} km\n")
-            append("Trip B: ${formatTripDistance(tripB)} km\n")
-            append("Trip C: ${formatTripDistance(tripC)} km")
-        }
+        // Build list of trip meter items (browsable rows navigate to detail screen)
+        val listBuilder = ItemList.Builder()
         
-        // Use MessageTemplate with limited actions (max 2)
-        return MessageTemplate.Builder(message)
+        // Trip A - browsable row
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("Trip A: ${formatTripDistance(tripA)} km")
+                .setBrowsable(true)
+                .setOnClickListener {
+                    screenManager.push(
+                        TripMeterDetailScreen(
+                            carContext,
+                            tripMeterManager,
+                            TripMeterManager.TripMeter.A,
+                            currentOdometer
+                        )
+                    )
+                }
+                .build()
+        )
+        
+        // Trip B - browsable row
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("Trip B: ${formatTripDistance(tripB)} km")
+                .setBrowsable(true)
+                .setOnClickListener {
+                    screenManager.push(
+                        TripMeterDetailScreen(
+                            carContext,
+                            tripMeterManager,
+                            TripMeterManager.TripMeter.B,
+                            currentOdometer
+                        )
+                    )
+                }
+                .build()
+        )
+        
+        // Trip C - browsable row
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("Trip C: ${formatTripDistance(tripC)} km")
+                .setBrowsable(true)
+                .setOnClickListener {
+                    screenManager.push(
+                        TripMeterDetailScreen(
+                            carContext,
+                            tripMeterManager,
+                            TripMeterManager.TripMeter.C,
+                            currentOdometer
+                        )
+                    )
+                }
+                .build()
+        )
+        
+        // Clear All - browsable row leading to confirmation
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("Clear All Trips")
+                .setBrowsable(true)
+                .setOnClickListener {
+                    screenManager.push(
+                        ClearAllTripsConfirmScreen(
+                            carContext,
+                            tripMeterManager,
+                            currentOdometer
+                        )
+                    )
+                }
+                .build()
+        )
+        
+        // Use ListTemplate for the trip meter list
+        return ListTemplate.Builder()
             .setTitle("Trip Meters")
             .setHeaderAction(Action.BACK)
-            .addAction(
-                Action.Builder()
-                    .setTitle("Reset All")
-                    .setOnClickListener(ParkedOnlyOnClickListener.create {
-                        tripMeterManager.resetTrip(TripMeterManager.TripMeter.A, currentOdometer)
-                        tripMeterManager.resetTrip(TripMeterManager.TripMeter.B, currentOdometer)
-                        tripMeterManager.resetTrip(TripMeterManager.TripMeter.C, currentOdometer)
-                        invalidate()
-                    })
-                    .build()
-            )
-            .addAction(
-                Action.Builder()
-                    .setTitle("Clear All")
-                    .setOnClickListener(ParkedOnlyOnClickListener.create {
-                        tripMeterManager.clearAllTrips()
-                        invalidate()
-                    })
-                    .build()
-            )
+            .setSingleList(listBuilder.build())
             .build()
     }
     
