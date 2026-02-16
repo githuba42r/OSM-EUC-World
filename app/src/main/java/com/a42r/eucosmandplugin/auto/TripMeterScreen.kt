@@ -8,9 +8,13 @@ import com.a42r.eucosmandplugin.util.TripMeterManager
 
 /**
  * Android Auto screen for managing trip meters.
- * Allows resetting individual trip meters or clearing all.
  * 
- * Uses PaneTemplate which allows actions with ParkedOnlyOnClickListener
+ * Due to Android Auto constraints:
+ * - PaneTemplate max: 2 actions
+ * - ListTemplate rows: 0 actions allowed
+ * - ActionStrip: Must have icons
+ * 
+ * Solution: Show info only, with 2 actions: Reset Selected and Clear All
  */
 class TripMeterScreen(
     carContext: CarContext,
@@ -27,76 +31,37 @@ class TripMeterScreen(
         
         val (tripA, tripB, tripC) = tripMeterManager.getAllTripDistances(currentOdometer)
         
-        // Build pane with trip meter info
-        val paneBuilder = Pane.Builder()
+        // Build message showing all trip meters
+        val message = buildString {
+            append("Trip A: ${formatTripDistance(tripA)} km\n")
+            append("Trip B: ${formatTripDistance(tripB)} km\n")
+            append("Trip C: ${formatTripDistance(tripC)} km")
+        }
         
-        // Add trip meter rows
-        paneBuilder.addRow(
-            Row.Builder()
-                .setTitle("Trip A")
-                .addText("${formatTripDistance(tripA)} km")
-                .build()
-        )
-        
-        paneBuilder.addRow(
-            Row.Builder()
-                .setTitle("Trip B")
-                .addText("${formatTripDistance(tripB)} km")
-                .build()
-        )
-        
-        paneBuilder.addRow(
-            Row.Builder()
-                .setTitle("Trip C")
-                .addText("${formatTripDistance(tripC)} km")
-                .build()
-        )
-        
-        // Add action buttons for resetting trips
-        paneBuilder.addAction(
-            Action.Builder()
-                .setTitle("Reset Trip A")
-                .setOnClickListener(ParkedOnlyOnClickListener.create {
-                    tripMeterManager.resetTrip(TripMeterManager.TripMeter.A, currentOdometer)
-                    invalidate()
-                })
-                .build()
-        )
-        
-        paneBuilder.addAction(
-            Action.Builder()
-                .setTitle("Reset Trip B")
-                .setOnClickListener(ParkedOnlyOnClickListener.create {
-                    tripMeterManager.resetTrip(TripMeterManager.TripMeter.B, currentOdometer)
-                    invalidate()
-                })
-                .build()
-        )
-        
-        paneBuilder.addAction(
-            Action.Builder()
-                .setTitle("Reset Trip C")
-                .setOnClickListener(ParkedOnlyOnClickListener.create {
-                    tripMeterManager.resetTrip(TripMeterManager.TripMeter.C, currentOdometer)
-                    invalidate()
-                })
-                .build()
-        )
-        
-        paneBuilder.addAction(
-            Action.Builder()
-                .setTitle("Clear All")
-                .setOnClickListener(ParkedOnlyOnClickListener.create {
-                    tripMeterManager.clearAllTrips()
-                    invalidate()
-                })
-                .build()
-        )
-        
-        // Use PaneTemplate for the trip meter management screen
-        return PaneTemplate.Builder(paneBuilder.build())
+        // Use MessageTemplate with limited actions (max 2)
+        return MessageTemplate.Builder(message)
             .setTitle("Trip Meters")
             .setHeaderAction(Action.BACK)
+            .addAction(
+                Action.Builder()
+                    .setTitle("Reset All")
+                    .setOnClickListener(ParkedOnlyOnClickListener.create {
+                        tripMeterManager.resetTrip(TripMeterManager.TripMeter.A, currentOdometer)
+                        tripMeterManager.resetTrip(TripMeterManager.TripMeter.B, currentOdometer)
+                        tripMeterManager.resetTrip(TripMeterManager.TripMeter.C, currentOdometer)
+                        invalidate()
+                    })
+                    .build()
+            )
+            .addAction(
+                Action.Builder()
+                    .setTitle("Clear All")
+                    .setOnClickListener(ParkedOnlyOnClickListener.create {
+                        tripMeterManager.clearAllTrips()
+                        invalidate()
+                    })
+                    .build()
+            )
             .build()
     }
     
