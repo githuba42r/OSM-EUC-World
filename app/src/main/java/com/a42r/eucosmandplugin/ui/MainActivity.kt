@@ -152,6 +152,21 @@ class MainActivity : AppCompatActivity() {
             eucService?.triggerImmediateBroadcast()
         }
         
+        // Single click on Trip A to select it in dropdown
+        binding.tvTripA.setOnClickListener {
+            binding.spinnerTripSelect.setSelection(0) // Trip A is position 0
+        }
+        
+        // Single click on Trip B to select it in dropdown
+        binding.tvTripB.setOnClickListener {
+            binding.spinnerTripSelect.setSelection(1) // Trip B is position 1
+        }
+        
+        // Single click on Trip C to select it in dropdown
+        binding.tvTripC.setOnClickListener {
+            binding.spinnerTripSelect.setSelection(2) // Trip C is position 2
+        }
+        
         // Long click on Trip A to reset it
         binding.tvTripA.setOnLongClickListener {
             if (currentOdometer > 0) {
