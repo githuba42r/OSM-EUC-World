@@ -21,13 +21,15 @@
             android:inputType="number"
             app:iconSpaceReserved="false" />
 
-        <SeekBarPreference
+        <com.a42r.eucosmandplugin.ui.SeekBarWithEditTextPreference
             android:key="poll_interval"
             android:title="@string/settings_poll_interval"
+            android:summary="@string/settings_poll_interval_summary"
             android:defaultValue="500"
-            android:max="2000"
             app:min="100"
-            app:showSeekBarValue="true"
+            app:max="2000"
+            app:suffix="ms"
+            app:updateInterval="50"
             app:iconSpaceReserved="false" />
 
     </PreferenceCategory>
@@ -61,6 +63,19 @@
             android:title="@string/settings_use_metric"
             android:summary="@string/settings_use_metric_summary"
             android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/settings_category_android_auto"
+        app:iconSpaceReserved="false">
+
+        <com.a42r.eucosmandplugin.ui.AndroidAutoIntervalPreference
+            android:key="android_auto_update_interval"
+            android:title="@string/settings_android_auto_update_interval"
+            android:summary="@string/settings_android_auto_update_interval_summary"
+            android:defaultValue="15"
             app:iconSpaceReserved="false" />
 
     </PreferenceCategory>

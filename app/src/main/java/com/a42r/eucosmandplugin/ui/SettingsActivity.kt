@@ -55,25 +55,9 @@ class SettingsActivity : AppCompatActivity() {
                 summaryProvider = EditTextPreference.SimpleSummaryProvider.getInstance()
             }
             
-            // Poll interval preference
-            findPreference<SeekBarPreference>("poll_interval")?.apply {
-                min = 100
-                max = 2000
-                setDefaultValue(500)
-                summary = "Update interval: ${value}ms"
-                setOnPreferenceChangeListener { preference, newValue ->
-                    preference.summary = "Update interval: ${newValue}ms"
-                    true
-                }
-            }
-            
             // Hide notification preference
             findPreference<SwitchPreferenceCompat>("hide_notification")?.apply {
                 setDefaultValue(false)
-                setOnPreferenceChangeListener { _, newValue ->
-                    // The service will check this preference when creating/updating notifications
-                    true
-                }
             }
             
             // Auto-start on boot preference

@@ -19,10 +19,10 @@
     <string name="launch_osmand">Open OsmAnd</string>
     
     <!-- Status -->
-    <string name="status_disconnected">Disconnected</string>
-    <string name="status_connecting">Connecting...</string>
-    <string name="status_connected">Connected</string>
-    <string name="status_wheel_disconnected">Wheel Disconnected</string>
+    <string name="status_disconnected">EUC World: Disconnected</string>
+    <string name="status_connecting">EUC World: Connecting...</string>
+    <string name="status_connected">Wheel: Connected</string>
+    <string name="status_wheel_disconnected">Wheel: Disconnected</string>
     <string name="status_error">Connection Error</string>
     <string name="not_connected">Not Connected</string>
     <string name="wheel_unknown">Unknown Wheel</string>
@@ -59,11 +59,14 @@
     <string name="settings_category_general">General</string>
     <string name="settings_auto_start">Auto-start on boot</string>
     <string name="settings_auto_start_summary">Start the service automatically when device boots</string>
-    <string name="settings_hide_notification">Minimize notification</string>
-    <string name="settings_hide_notification_summary">Show minimal silent notification when service is running</string>
+    <string name="settings_hide_notification">Hide notification icon</string>
+    <string name="settings_hide_notification_summary">Hide notification icon from status bar (notification still visible in notification shade)</string>
     <string name="settings_category_display">Display</string>
     <string name="settings_use_metric">Use Metric Units</string>
     <string name="settings_use_metric_summary">Display speed in km/h and temperature in Celsius</string>
+    <string name="settings_category_android_auto">Android Auto</string>
+    <string name="settings_android_auto_update_interval">Display Update Interval</string>
+    <string name="settings_android_auto_update_interval_summary">How often to refresh Android Auto display (seconds). Higher values save battery.</string>
     
     <!-- Widget -->
     <string name="widget_name">EUC Battery Status</string>

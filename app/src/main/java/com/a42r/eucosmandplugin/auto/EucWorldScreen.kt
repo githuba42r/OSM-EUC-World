@@ -10,56 +10,90 @@ import androidx.car.app.Screen
 import androidx.car.app.model.*
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import androidx.preference.PreferenceManager
 import com.a42r.eucosmandplugin.api.EucData
 import com.a42r.eucosmandplugin.service.AutoProxyReceiver
 import com.a42r.eucosmandplugin.service.ConnectionState
+import com.a42r.eucosmandplugin.util.TripMeterManager
 
 /**
- * Quick-glance screen for Android Auto showing EUC battery status.
+ * Android Auto screen showing EUC telemetry with detailed layout.
  * 
- * Uses MessageTemplate for maximum compatibility with all Android Auto hosts.
+ * Layout similar to phone app:
+ * - Device name and connection status at top
+ * - Large battery percentage display
+ * - Voltage underneath battery
+ * - Three trip meters at bottom with reset buttons
  */
 class EucWorldScreen(carContext: CarContext) : Screen(carContext) {
     
     companion object {
         private const val TAG = "EucWorldScreen"
+        private const val ACTION_RESET_TRIP_A = "reset_trip_a"
+        private const val ACTION_RESET_TRIP_B = "reset_trip_b"
+        private const val ACTION_RESET_TRIP_C = "reset_trip_c"
+        private const val ACTION_CLEAR_ALL_TRIPS = "clear_all_trips"
+        
+        // Default throttling settings
+        private const val DEFAULT_UPDATE_INTERVAL_SECONDS = 15
+        private const val MIN_UPDATE_INTERVAL_SECONDS = 5
+        private const val MAX_UPDATE_INTERVAL_SECONDS = 300 // 5 minutes
     }
     
     // Current EUC data
     private var eucData: EucData? = null
     private var connectionState: ConnectionState = ConnectionState.DISCONNECTED
+    private var deviceName: String = "EUC"
     
-    // Trip data from service
-    private var tripA: Double? = null
-    private var tripB: Double? = null
-    private var tripC: Double? = null
-    private var tripAActive = false
-    private var tripBActive = false
-    private var tripCActive = false
+    // Trip meter manager
+    private val tripMeterManager = TripMeterManager(carContext)
+    private var currentOdometer: Double = 0.0
+    
+    // Throttling: track last template data to avoid unnecessary updates
+    private var lastUpdateTime: Long = 0
+    private var lastBatteryPercentage: Int? = null
+    private var lastVoltage: Double? = null
+    private var lastConnectionState: ConnectionState = ConnectionState.DISCONNECTED
+    
+    /**
+     * Get the user-configured update interval from preferences
+     */
+    private fun getUpdateIntervalMs(): Long {
+        val prefs = PreferenceManager.getDefaultSharedPreferences(carContext)
+        val seconds = prefs.getInt("android_auto_update_interval", DEFAULT_UPDATE_INTERVAL_SECONDS)
+        return (seconds * 1000L).coerceIn(
+            MIN_UPDATE_INTERVAL_SECONDS * 1000L,
+            MAX_UPDATE_INTERVAL_SECONDS * 1000L
+        )
+    }
     
     // Receiver for data from phone
     private val dataReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            Log.d(TAG, "Received: ${intent.action}")
-            
             when (intent.action) {
                 AutoProxyReceiver.ACTION_EUC_DATA_UPDATE -> {
                     intent.extras?.let { bundle ->
                         eucData = AutoProxyReceiver.parseDataBundle(bundle)
-                        
-                        // Extract trip data
-                        val tA = bundle.getDouble(AutoProxyReceiver.EXTRA_TRIP_A, -1.0)
-                        val tB = bundle.getDouble(AutoProxyReceiver.EXTRA_TRIP_B, -1.0)
-                        val tC = bundle.getDouble(AutoProxyReceiver.EXTRA_TRIP_C, -1.0)
-                        tripA = if (tA >= 0) tA else null
-                        tripB = if (tB >= 0) tB else null
-                        tripC = if (tC >= 0) tC else null
-                        tripAActive = bundle.getBoolean(AutoProxyReceiver.EXTRA_TRIP_A_ACTIVE, false)
-                        tripBActive = bundle.getBoolean(AutoProxyReceiver.EXTRA_TRIP_B_ACTIVE, false)
-                        tripCActive = bundle.getBoolean(AutoProxyReceiver.EXTRA_TRIP_C_ACTIVE, false)
+                        eucData?.let { data ->
+                            // Extract device name
+                            if (data.wheelModel.isNotEmpty()) {
+                                deviceName = data.wheelModel
+                            }
+                            // Store odometer for trip calculations
+                            currentOdometer = data.totalDistance
+                        }
                         
                         connectionState = ConnectionState.CONNECTED
-                        invalidate()
+                        
+                        // Only invalidate if enough time has passed or data significantly changed
+                        if (shouldInvalidate()) {
+                            lastUpdateTime = System.currentTimeMillis()
+                            lastBatteryPercentage = eucData?.batteryPercentage
+                            lastVoltage = eucData?.voltage
+                            lastConnectionState = connectionState
+                            Log.d(TAG, "Invalidating template (data changed)")
+                            invalidate()
+                        }
                     }
                 }
                 AutoProxyReceiver.ACTION_CONNECTION_STATE -> {
@@ -72,10 +106,55 @@ class EucWorldScreen(carContext: CarContext) : Screen(carContext) {
                     if (connectionState != ConnectionState.CONNECTED) {
                         eucData = null
                     }
-                    invalidate()
+                    
+                    // Always update on connection state change
+                    if (connectionState != lastConnectionState) {
+                        lastConnectionState = connectionState
+                        Log.d(TAG, "Invalidating template (connection state changed to $connectionState)")
+                        invalidate()
+                    }
                 }
             }
         }
+    }
+    
+    /**
+     * Check if we should invalidate the template.
+     * Only invalidate if:
+     * 1. Enough time has passed since last update (throttling)
+     * 2. OR connection state changed
+     * 3. OR battery percentage changed by 1% or more
+     * 4. OR voltage changed significantly
+     */
+    private fun shouldInvalidate(): Boolean {
+        val now = System.currentTimeMillis()
+        val timeSinceLastUpdate = now - lastUpdateTime
+        val minInterval = getUpdateIntervalMs()
+        
+        // If minimum interval hasn't passed, check if critical data changed
+        if (timeSinceLastUpdate < minInterval) {
+            val currentBattery = eucData?.batteryPercentage
+            val currentVoltage = eucData?.voltage
+            
+            // Allow update if battery changed
+            if (currentBattery != lastBatteryPercentage) {
+                return true
+            }
+            
+            // Allow update if voltage changed by more than 0.5V
+            if (currentVoltage != null && lastVoltage != null) {
+                if (Math.abs(currentVoltage - lastVoltage!!) > 0.5) {
+                    return true
+                }
+            }
+            
+            // Connection state is handled separately
+            
+            return false
+        }
+        
+        // Enough time has passed
+        return true
     }
     
     private val lifecycleObserver = object : DefaultLifecycleObserver {
@@ -126,43 +205,105 @@ class EucWorldScreen(carContext: CarContext) : Screen(carContext) {
     }
     
     /**
-     * Create the connected template with battery, voltage, and active trips
+     * Create the connected template with full layout  
      */
     private fun createConnectedTemplate(data: EucData): Template {
-        // Build the message text
-        val messageBuilder = StringBuilder()
-        messageBuilder.append("${data.batteryPercentage}%  •  ${String.format("%.1fV", data.voltage)}")
-        
-        // Add active trips
-        val trips = mutableListOf<String>()
-        if (tripAActive && tripA != null) {
-            trips.add("A: ${String.format("%.1f", tripA)} km")
-        }
-        if (tripBActive && tripB != null) {
-            trips.add("B: ${String.format("%.1f", tripB)} km")
-        }
-        if (tripCActive && tripC != null) {
-            trips.add("C: ${String.format("%.1f", tripC)} km")
+        // Connection status string
+        val connectionStatus = when (connectionState) {
+            ConnectionState.CONNECTED -> "Connected"
+            ConnectionState.CONNECTING -> "Connecting..."
+            ConnectionState.WHEEL_DISCONNECTED -> "Wheel Disconnected"
+            ConnectionState.DISCONNECTED -> "Disconnected"
+            ConnectionState.ERROR -> "Error"
         }
         
-        if (trips.isNotEmpty()) {
-            messageBuilder.append("\n")
-            messageBuilder.append(trips.joinToString("  •  "))
+        // Row 1: Large Battery Percentage (most prominent)
+        val batteryRow = Row.Builder()
+            .setTitle("${data.batteryPercentage}%")
+            .build()
+        
+        // Row 2: Voltage (under battery)
+        val voltageRow = Row.Builder()
+            .setTitle(String.format("%.2f V", data.voltage))
+            .build()
+        
+        // Row 3: Trip meters on a single line
+        val (tripA, tripB, tripC) = tripMeterManager.getAllTripDistances(currentOdometer)
+        val tripLine = "A: ${formatTripDistance(tripA)} km  •  B: ${formatTripDistance(tripB)} km  •  C: ${formatTripDistance(tripC)} km"
+        
+        val tripRow = Row.Builder()
+            .setTitle("Trip Meters")
+            .addText(tripLine)
+            .build()
+        
+        // Build pane with rows
+        val paneBuilder = Pane.Builder()
+            .addRow(batteryRow)
+            .addRow(voltageRow)
+            .addRow(tripRow)
+        
+        // Create action strip with only one action (Android Auto IOT limit)
+        val actionStripBuilder = ActionStrip.Builder()
+        
+        // Navigate to Trip Meters screen
+        actionStripBuilder.addAction(
+            Action.Builder()
+                .setTitle("Trip Meters")
+                .setOnClickListener {
+                    screenManager.push(TripMeterScreen(carContext, tripMeterManager, currentOdometer))
+                }
+                .build()
+        )
+        
+        // Device name and connection status in the title bar
+        return PaneTemplate.Builder(paneBuilder.build())
+            .setTitle("$deviceName • $connectionStatus")
+            .setHeaderAction(Action.APP_ICON)
+            .setActionStrip(actionStripBuilder.build())
+            .build()
+    }
+    
+    /**
+     * Create the disconnected template
+     */
+    private fun createDisconnectedTemplate(): Template {
+        val row1 = Row.Builder()
+            .setTitle("Not Connected")
+            .addText("Waiting for EUC World data...")
+            .build()
+        
+        val paneBuilder = Pane.Builder()
+            .addRow(row1)
+        
+        // Show trip meters even when disconnected (they persist)
+        val (tripA, tripB, tripC) = tripMeterManager.getAllTripDistances(currentOdometer)
+        
+        if (tripA != null || tripB != null || tripC != null) {
+            val tripLine = "A: ${formatTripDistance(tripA)} km  •  B: ${formatTripDistance(tripB)} km  •  C: ${formatTripDistance(tripC)} km"
+            
+            paneBuilder.addRow(
+                Row.Builder()
+                    .setTitle("Trip Meters")
+                    .addText(tripLine)
+                    .build()
+            )
         }
         
-        return MessageTemplate.Builder(messageBuilder.toString())
+        // Use PaneTemplate instead of ListTemplate (required for task flow completion)
+        return PaneTemplate.Builder(paneBuilder.build())
             .setTitle("EUC World")
             .setHeaderAction(Action.APP_ICON)
             .build()
     }
     
     /**
-     * Create the disconnected template showing NC
+     * Format trip distance for display
      */
-    private fun createDisconnectedTemplate(): Template {
-        return MessageTemplate.Builder("Not Connected")
-            .setTitle("EUC World")
-            .setHeaderAction(Action.APP_ICON)
-            .build()
+    private fun formatTripDistance(distance: Double?): String {
+        return if (distance != null) {
+            String.format("%.1f", distance)
+        } else {
+            "--"
+        }
     }
 }
