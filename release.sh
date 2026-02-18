@@ -1,6 +1,7 @@
 #!/bin/bash
 # Release script for EUC OsmAnd Plugin
-# Usage: ./release.sh [patch|minor|major]
+# Usage: ./release.sh [patch|minor|major] [version_code]
+#   If version_code is provided, it will be used instead of auto-incrementing
 
 set -e  # Exit on error
 
@@ -12,6 +13,7 @@ NC='\033[0m' # No Color
 
 # Default to patch version bump
 BUMP_TYPE=${1:-patch}
+SPECIFIED_CODE=${2:-}
 
 echo -e "${GREEN}=== EUC OsmAnd Plugin Release Script ===${NC}"
 echo ""
@@ -40,7 +42,14 @@ echo "3. Calculating new version..."
 NEW_MAJOR=$VERSION_MAJOR
 NEW_MINOR=$VERSION_MINOR
 NEW_PATCH=$VERSION_PATCH
-NEW_CODE=$((VERSION_CODE + 1))
+
+# Use specified code if provided, otherwise increment
+if [[ -n "$SPECIFIED_CODE" ]]; then
+    NEW_CODE=$SPECIFIED_CODE
+    echo -e "   ${YELLOW}Using specified version code: ${NEW_CODE}${NC}"
+else
+    NEW_CODE=$((VERSION_CODE + 1))
+fi
 
 case $BUMP_TYPE in
     major)
