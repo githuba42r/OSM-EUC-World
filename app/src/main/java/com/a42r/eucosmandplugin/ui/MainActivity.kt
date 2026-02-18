@@ -71,7 +71,8 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         
-        setSupportActionBar(binding.toolbar)
+        // Use the default ActionBar instead of custom toolbar
+        supportActionBar?.setDisplayShowTitleEnabled(true)
         
         tripMeterManager = TripMeterManager(this)
         
