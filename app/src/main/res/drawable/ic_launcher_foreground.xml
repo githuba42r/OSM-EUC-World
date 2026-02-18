@@ -1,16 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Placeholder launcher icon - replace with actual icon -->
+<!-- EUC OsmAnd Plugin Icon - Battery + Navigation -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Background circle -->
-    <path
-        android:fillColor="#2196F3"
-        android:pathData="M54,54m-48,0a48,48 0,1 1,96 0a48,48 0,1 1,-96 0"/>
-    <!-- Battery icon -->
+    
+    <!-- Battery body - main element -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M63.67,32H62V28h-8v4h-3.33C49.2,32 48,33.2 48,34.67v30.67C48,66.8 49.2,68 50.67,68h13.33c1.48,0 2.67,-1.2 2.67,-2.67V34.67C66.67,33.2 65.47,32 63.67,32zM58,60h-4v-4h4v4zM58,52h-4V42h4v10z"/>
+        android:pathData="M44,30h20c2.2,0 4,1.8 4,4v40c0,2.2-1.8,4-4,4H44c-2.2,0-4-1.8-4-4V34c0-2.2,1.8-4,4-4z"/>
+    
+    <!-- Battery terminal/cap -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M50,24h8c1.1,0 2,0.9 2,2v4h-12v-4c0-1.1,0.9-2,2-2z"/>
+    
+    <!-- Battery fill level (green - good charge) -->
+    <path
+        android:fillColor="#4CAF50"
+        android:pathData="M44,46h20v28c0,2.2-1.8,4-4,4H48c-2.2,0-4-1.8-4-4V46z"/>
+    
+    <!-- Location pin overlay (represents OsmAnd/navigation) -->
+    <path
+        android:fillColor="#2196F3"
+        android:pathData="M54,38c-5.5,0-10,4.5-10,10c0,7.5,10,18,10,18s10-10.5,10-18c0-5.5-4.5-10-10-10zM54,52c-2.2,0-4-1.8-4-4s1.8-4,4-4s4,1.8,4,4-1.8,4-4,4z"/>
+    
+    <!-- Small wheel icon bottom right (represents EUC) -->
+    <path
+        android:fillColor="#03DAC5"
+        android:pathData="M70,70m-8,0a8,8 0,1 1,16 0a8,8 0,1 1,-16 0"/>
+    <path
+        android:fillColor="#1A1A1A"
+        android:pathData="M70,70m-4,0a4,4 0,1 1,8 0a4,4 0,1 1,-8 0"/>
+    
+    <!-- Connectivity lines (small accent) -->
+    <path
+        android:strokeColor="#03DAC5"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:pathData="M64,72 L66,74 M64,68 L66,66 M76,68 L74,66 M76,72 L74,74"/>
 </vector>

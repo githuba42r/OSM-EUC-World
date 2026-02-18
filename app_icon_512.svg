@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Background with gradient -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1976D2;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2196F3;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  
+  <!-- Background rounded square -->
+  <rect width="512" height="512" rx="80" fill="url(#bgGradient)"/>
+  
+  <!-- Battery body - main element -->
+  <rect x="180" y="120" width="152" height="272" rx="16" fill="#FFFFFF" filter="url(#shadow)"/>
+  
+  <!-- Battery terminal/cap -->
+  <rect x="220" y="88" width="72" height="32" rx="8" fill="#FFFFFF"/>
+  
+  <!-- Battery fill level (green - good charge) -->
+  <rect x="180" y="232" width="152" height="160" rx="16" fill="#4CAF50"/>
+  
+  <!-- Location pin overlay (represents OsmAnd/navigation) -->
+  <g filter="url(#shadow)">
+    <path d="M 256 160 C 214 160 180 194 180 236 C 180 306 256 392 256 392 C 256 392 332 306 332 236 C 332 194 298 160 256 160 Z M 256 264 C 240.5 264 228 251.5 228 236 C 228 220.5 240.5 208 256 208 C 271.5 208 284 220.5 284 236 C 284 251.5 271.5 264 256 264 Z" fill="#2196F3"/>
+  </g>
+  
+  <!-- Small wheel icon bottom right (represents EUC) -->
+  <circle cx="380" cy="380" r="56" fill="#03DAC5" filter="url(#shadow)"/>
+  <circle cx="380" cy="380" r="28" fill="#1A1A1A"/>
+  <circle cx="380" cy="380" r="12" fill="#03DAC5"/>
+  
+  <!-- Wheel spokes -->
+  <line x1="380" y1="324" x2="380" y2="352" stroke="#03DAC5" stroke-width="4"/>
+  <line x1="380" y1="408" x2="380" y2="436" stroke="#03DAC5" stroke-width="4"/>
+  <line x1="324" y1="380" x2="352" y2="380" stroke="#03DAC5" stroke-width="4"/>
+  <line x1="408" y1="380" x2="436" y2="380" stroke="#03DAC5" stroke-width="4"/>
+  
+  <!-- Connectivity indicator (small signal waves) -->
+  <g opacity="0.8">
+    <path d="M 340 395 L 350 405" stroke="#03DAC5" stroke-width="6" stroke-linecap="round"/>
+    <path d="M 340 365 L 350 355" stroke="#03DAC5" stroke-width="6" stroke-linecap="round"/>
+    <path d="M 420 365 L 410 355" stroke="#03DAC5" stroke-width="6" stroke-linecap="round"/>
+    <path d="M 420 395 L 410 405" stroke="#03DAC5" stroke-width="6" stroke-linecap="round"/>
+  </g>
+</svg>

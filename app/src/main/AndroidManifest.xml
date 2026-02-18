@@ -10,6 +10,20 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- Device restrictions: Handhelds only (exclude tablets and Chromebooks) -->
+    <uses-feature
+        android:name="android.hardware.telephony"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.touchscreen"
+        android:required="true" />
+    <!-- Exclude tablets by requiring small/normal screen sizes -->
+    <supports-screens
+        android:smallScreens="true"
+        android:normalScreens="true"
+        android:largeScreens="false"
+        android:xlargeScreens="false" />
+
     <!-- Package visibility for OsmAnd detection (required Android 11+) -->
     <queries>
         <package android:name="net.osmand" />
