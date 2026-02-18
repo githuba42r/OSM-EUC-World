@@ -15,24 +15,45 @@ def versionMinor = (versionProps['VERSION_MINOR'] ?: '0').toInteger()
 def versionPatch = (versionProps['VERSION_PATCH'] ?: '0').toInteger()
 def versionCodeNum = (versionProps['VERSION_CODE'] ?: '1').toInteger()
 
+// Load keystore properties
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace 'com.a42r.eucosmandplugin'
-    compileSdk 34
+    compileSdk 35
 
     defaultConfig {
         applicationId "com.a42r.eucosmandplugin"
         minSdk 26
-        targetSdk 34
+        targetSdk 35
         versionCode versionCodeNum
         versionName "${versionMajor}.${versionMinor}.${versionPatch}"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (keystorePropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 

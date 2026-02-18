@@ -76,3 +76,5 @@ Thumbs.db
 .env.*
 credentials.json
 secrets.xml
+keystore.passwd
+keystore.properties
