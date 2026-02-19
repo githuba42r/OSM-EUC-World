@@ -24,29 +24,47 @@ class ClearAllTripsConfirmScreen(
         
         val (tripA, tripB, tripC) = tripMeterManager.getAllTripDistances(currentOdometer)
         
-        val message = "${formatTripDistance(tripA)} km / ${formatTripDistance(tripB)} km / ${formatTripDistance(tripC)} km"
+        // Build list showing current values and actions
+        val listBuilder = ItemList.Builder()
         
-        return MessageTemplate.Builder(message)
+        // Show current trip values
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("Current Trip Meters")
+                .addText("A: ${formatTripDistance(tripA)} km  •  B: ${formatTripDistance(tripB)} km  •  C: ${formatTripDistance(tripC)} km")
+                .build()
+        )
+        
+        // Clear All action - browsable row
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("Clear All Trips")
+                .addText("Stop tracking all trip meters")
+                .setBrowsable(true)
+                .setOnClickListener {
+                    tripMeterManager.clearAllTrips()
+                    screenManager.popToRoot()
+                }
+                .build()
+        )
+        
+        // Cancel action - browsable row
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("Cancel")
+                .addText("Go back without clearing")
+                .setBrowsable(true)
+                .setOnClickListener {
+                    screenManager.pop()
+                }
+                .build()
+        )
+        
+        // Use ListTemplate to allow use while driving
+        return ListTemplate.Builder()
             .setTitle("Clear All?")
             .setHeaderAction(Action.BACK)
-            .addAction(
-                Action.Builder()
-                    .setTitle("Cancel")
-                    .setOnClickListener {
-                        screenManager.pop()
-                    }
-                    .build()
-            )
-            .addAction(
-                Action.Builder()
-                    .setTitle("Clear All")
-                    .setOnClickListener(ParkedOnlyOnClickListener.create {
-                        tripMeterManager.clearAllTrips()
-                        // Pop back to list screen
-                        screenManager.pop()
-                    })
-                    .build()
-            )
+            .setSingleList(listBuilder.build())
             .build()
     }
     

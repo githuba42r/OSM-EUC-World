@@ -30,36 +30,56 @@ class TripMeterDetailScreen(
         val tripDistance = tripMeterManager.getTripDistance(tripMeter, currentOdometer)
         val isActive = tripMeterManager.isTripActive(tripMeter)
         
-        // Build message showing trip meter value
-        val message = buildString {
-            append("${formatTripDistance(tripDistance)} km")
-            if (!isActive) {
-                append("\n\n(Not tracking)")
-            }
+        // Build list with trip value and action items
+        val listBuilder = ItemList.Builder()
+        
+        // Show current trip value
+        val distanceText = if (isActive) {
+            "${formatTripDistance(tripDistance)} km"
+        } else {
+            "${formatTripDistance(tripDistance)} km (Not tracking)"
         }
         
-        // Use MessageTemplate with Reset and Clear actions
-        return MessageTemplate.Builder(message)
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("Distance")
+                .addText(distanceText)
+                .build()
+        )
+        
+        // Reset action - browsable row
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("Reset Trip ${tripMeter.name}")
+                .addText("Start tracking from current odometer")
+                .setBrowsable(true)
+                .setOnClickListener {
+                    tripMeterManager.resetTrip(tripMeter, currentOdometer)
+                    invalidate()
+                    screenManager.pop()
+                }
+                .build()
+        )
+        
+        // Clear action - browsable row
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("Clear Trip ${tripMeter.name}")
+                .addText("Stop tracking this trip")
+                .setBrowsable(true)
+                .setOnClickListener {
+                    tripMeterManager.clearTrip(tripMeter)
+                    invalidate()
+                    screenManager.pop()
+                }
+                .build()
+        )
+        
+        // Use ListTemplate to allow use while driving
+        return ListTemplate.Builder()
             .setTitle("Trip ${tripMeter.name}")
             .setHeaderAction(Action.BACK)
-            .addAction(
-                Action.Builder()
-                    .setTitle("Reset")
-                    .setOnClickListener(ParkedOnlyOnClickListener.create {
-                        tripMeterManager.resetTrip(tripMeter, currentOdometer)
-                        invalidate()
-                    })
-                    .build()
-            )
-            .addAction(
-                Action.Builder()
-                    .setTitle("Clear")
-                    .setOnClickListener(ParkedOnlyOnClickListener.create {
-                        tripMeterManager.clearTrip(tripMeter)
-                        invalidate()
-                    })
-                    .build()
-            )
+            .setSingleList(listBuilder.build())
             .build()
     }
     

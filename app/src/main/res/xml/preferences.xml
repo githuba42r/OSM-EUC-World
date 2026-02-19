@@ -72,6 +72,38 @@
             android:defaultValue="true"
             app:iconSpaceReserved="false" />
 
+        <EditTextPreference
+            android:key="battery_warning_percent"
+            android:title="@string/settings_battery_warning_percent"
+            android:summary="@string/settings_battery_warning_percent_summary"
+            android:defaultValue="30"
+            android:inputType="number"
+            app:iconSpaceReserved="false" />
+
+        <EditTextPreference
+            android:key="battery_critical_percent"
+            android:title="@string/settings_battery_critical_percent"
+            android:summary="@string/settings_battery_critical_percent_summary"
+            android:defaultValue="20"
+            android:inputType="number"
+            app:iconSpaceReserved="false" />
+
+        <EditTextPreference
+            android:key="battery_warning_voltage"
+            android:title="@string/settings_battery_warning_voltage"
+            android:summary="@string/settings_battery_warning_voltage_summary"
+            android:defaultValue="78.0"
+            android:inputType="numberDecimal"
+            app:iconSpaceReserved="false" />
+
+        <EditTextPreference
+            android:key="battery_critical_voltage"
+            android:title="@string/settings_battery_critical_voltage"
+            android:summary="@string/settings_battery_critical_voltage_summary"
+            android:defaultValue="72.0"
+            android:inputType="numberDecimal"
+            app:iconSpaceReserved="false" />
+
     </PreferenceCategory>
 
     <PreferenceCategory

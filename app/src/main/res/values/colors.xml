@@ -5,6 +5,7 @@
     <color name="battery_medium">#FFEB3B</color>
     <color name="battery_low">#FF9800</color>
     <color name="battery_critical">#F44336</color>
+    <color name="battery_warning">#FFC107</color>
     
     <!-- Connection status colors -->
     <color name="status_connected">#4CAF50</color>
@@ -20,6 +21,7 @@
     <color name="background_dark">#1A1A1A</color>
     <color name="background_card">#2D2D2D</color>
     <color name="background_surface">#121212</color>
+    <color name="background_card_warning">#3D2020</color>
     
     <!-- Widget colors -->
     <color name="widget_background">#CC000000</color>

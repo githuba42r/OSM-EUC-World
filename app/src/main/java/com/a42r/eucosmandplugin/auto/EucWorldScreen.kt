@@ -84,9 +84,14 @@ class EucWorldScreen(carContext: CarContext) : Screen(carContext) {
                             }
                             // Store odometer for trip calculations
                             currentOdometer = data.totalDistance
+                            
+                            // Update connection state based on actual wheel connection
+                            connectionState = if (data.isConnected) {
+                                ConnectionState.CONNECTED
+                            } else {
+                                ConnectionState.WHEEL_DISCONNECTED
+                            }
                         }
-                        
-                        connectionState = ConnectionState.CONNECTED
                         
                         // Only invalidate if enough time has passed or data significantly changed
                         if (shouldInvalidate()) {
@@ -237,38 +242,34 @@ class EucWorldScreen(carContext: CarContext) : Screen(carContext) {
             ConnectionState.ERROR -> "Error"
         }
         
+        // Build list with informational rows
+        val listBuilder = ItemList.Builder()
+        
         // Row 1: Large Battery Percentage (most prominent)
-        val batteryRow = Row.Builder()
-            .setTitle("${data.batteryPercentage}%")
-            .build()
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("Battery")
+                .addText("${data.batteryPercentage}%")
+                .build()
+        )
         
         // Row 2: Voltage (under battery)
-        val voltageRow = Row.Builder()
-            .setTitle(String.format("%.2f V", data.voltage))
-            .build()
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("Voltage")
+                .addText(String.format("%.2f V", data.voltage))
+                .build()
+        )
         
-        // Row 3: Trip meters on a single line
+        // Row 3: Trip meters - browsable to navigate to detail screen
         val (tripA, tripB, tripC) = tripMeterManager.getAllTripDistances(currentOdometer)
         val tripLine = "A: ${formatTripDistance(tripA)} km  •  B: ${formatTripDistance(tripB)} km  •  C: ${formatTripDistance(tripC)} km"
         
-        val tripRow = Row.Builder()
-            .setTitle("Trip Meters")
-            .addText(tripLine)
-            .build()
-        
-        // Build pane with rows
-        val paneBuilder = Pane.Builder()
-            .addRow(batteryRow)
-            .addRow(voltageRow)
-            .addRow(tripRow)
-        
-        // Create action strip with only one action (Android Auto IOT limit)
-        val actionStripBuilder = ActionStrip.Builder()
-        
-        // Navigate to Trip Meters screen
-        actionStripBuilder.addAction(
-            Action.Builder()
+        listBuilder.addItem(
+            Row.Builder()
                 .setTitle("Trip Meters")
+                .addText(tripLine)
+                .setBrowsable(true)
                 .setOnClickListener {
                     screenManager.push(TripMeterScreen(carContext, tripMeterManager, currentOdometer))
                 }
@@ -276,10 +277,11 @@ class EucWorldScreen(carContext: CarContext) : Screen(carContext) {
         )
         
         // Device name and connection status in the title bar
-        return PaneTemplate.Builder(paneBuilder.build())
+        // Use ListTemplate instead of PaneTemplate to avoid task completion requirements
+        return ListTemplate.Builder()
             .setTitle("$deviceName • $connectionStatus")
             .setHeaderAction(Action.APP_ICON)
-            .setActionStrip(actionStripBuilder.build())
+            .setSingleList(listBuilder.build())
             .build()
     }
     
@@ -287,13 +289,14 @@ class EucWorldScreen(carContext: CarContext) : Screen(carContext) {
      * Create the disconnected template
      */
     private fun createDisconnectedTemplate(): Template {
-        val row1 = Row.Builder()
-            .setTitle("Not Connected")
-            .addText("Waiting for EUC World data...")
-            .build()
+        val listBuilder = ItemList.Builder()
         
-        val paneBuilder = Pane.Builder()
-            .addRow(row1)
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("Not Connected")
+                .addText("Waiting for EUC World data...")
+                .build()
+        )
         
         // Show trip meters even when disconnected (they persist)
         val (tripA, tripB, tripC) = tripMeterManager.getAllTripDistances(currentOdometer)
@@ -301,18 +304,23 @@ class EucWorldScreen(carContext: CarContext) : Screen(carContext) {
         if (tripA != null || tripB != null || tripC != null) {
             val tripLine = "A: ${formatTripDistance(tripA)} km  •  B: ${formatTripDistance(tripB)} km  •  C: ${formatTripDistance(tripC)} km"
             
-            paneBuilder.addRow(
+            listBuilder.addItem(
                 Row.Builder()
                     .setTitle("Trip Meters")
                     .addText(tripLine)
+                    .setBrowsable(true)
+                    .setOnClickListener {
+                        screenManager.push(TripMeterScreen(carContext, tripMeterManager, currentOdometer))
+                    }
                     .build()
             )
         }
         
-        // Use PaneTemplate instead of ListTemplate (required for task flow completion)
-        return PaneTemplate.Builder(paneBuilder.build())
+        // Use ListTemplate to match connected state and avoid task completion requirements
+        return ListTemplate.Builder()
             .setTitle("EUC World")
             .setHeaderAction(Action.APP_ICON)
+            .setSingleList(listBuilder.build())
             .build()
     }
     

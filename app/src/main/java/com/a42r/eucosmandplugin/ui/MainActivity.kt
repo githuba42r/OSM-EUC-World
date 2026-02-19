@@ -15,6 +15,7 @@ import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -153,17 +154,13 @@ class MainActivity : AppCompatActivity() {
         // Reset selected trip button
         binding.btnResetTrip.setOnClickListener {
             if (currentOdometer > 0) {
-                tripMeterManager.resetTrip(selectedTripMeter, currentOdometer)
-                updateTripMeters()
-                eucService?.triggerImmediateBroadcast()
+                showResetTripConfirmation(selectedTripMeter)
             }
         }
         
         // Clear all trips button
         binding.btnClearAllTrips.setOnClickListener {
-            tripMeterManager.clearAllTrips()
-            updateTripMeters()
-            eucService?.triggerImmediateBroadcast()
+            showClearAllTripsConfirmation()
         }
         
         // Single click on Trip A to select it in dropdown
@@ -184,9 +181,7 @@ class MainActivity : AppCompatActivity() {
         // Long click on Trip A to reset it
         binding.tvTripA.setOnLongClickListener {
             if (currentOdometer > 0) {
-                tripMeterManager.resetTrip(TripMeterManager.TripMeter.A, currentOdometer)
-                updateTripMeters()
-                eucService?.triggerImmediateBroadcast()
+                showResetTripConfirmation(TripMeterManager.TripMeter.A)
             }
             true
         }
@@ -194,9 +189,7 @@ class MainActivity : AppCompatActivity() {
         // Long click on Trip B to reset it
         binding.tvTripB.setOnLongClickListener {
             if (currentOdometer > 0) {
-                tripMeterManager.resetTrip(TripMeterManager.TripMeter.B, currentOdometer)
-                updateTripMeters()
-                eucService?.triggerImmediateBroadcast()
+                showResetTripConfirmation(TripMeterManager.TripMeter.B)
             }
             true
         }
@@ -204,9 +197,31 @@ class MainActivity : AppCompatActivity() {
         // Long click on Trip C to reset it
         binding.tvTripC.setOnLongClickListener {
             if (currentOdometer > 0) {
-                tripMeterManager.resetTrip(TripMeterManager.TripMeter.C, currentOdometer)
-                updateTripMeters()
-                eucService?.triggerImmediateBroadcast()
+                showResetTripConfirmation(TripMeterManager.TripMeter.C)
+            }
+            true
+        }
+        
+        // Long click on Trip A label to reset it
+        binding.tvLabelTripA.setOnLongClickListener {
+            if (currentOdometer > 0) {
+                showResetTripConfirmation(TripMeterManager.TripMeter.A)
+            }
+            true
+        }
+        
+        // Long click on Trip B label to reset it
+        binding.tvLabelTripB.setOnLongClickListener {
+            if (currentOdometer > 0) {
+                showResetTripConfirmation(TripMeterManager.TripMeter.B)
+            }
+            true
+        }
+        
+        // Long click on Trip C label to reset it
+        binding.tvLabelTripC.setOnLongClickListener {
+            if (currentOdometer > 0) {
+                showResetTripConfirmation(TripMeterManager.TripMeter.C)
             }
             true
         }
@@ -277,14 +292,21 @@ class MainActivity : AppCompatActivity() {
         binding.tvBatteryPercent.text = "${data.batteryPercentage}%"
         binding.tvVoltage.text = String.format("%.1fV", data.voltage)
         
-        // Color based on battery level
+        // Get battery warning/critical thresholds from settings
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        val warningPercent = prefs.getString("battery_warning_percent", "30")?.toIntOrNull() ?: 30
+        val criticalPercent = prefs.getString("battery_critical_percent", "20")?.toIntOrNull() ?: 20
+        val warningVoltage = prefs.getString("battery_warning_voltage", "78.0")?.toDoubleOrNull() ?: 78.0
+        val criticalVoltage = prefs.getString("battery_critical_voltage", "72.0")?.toDoubleOrNull() ?: 72.0
+        
+        // Color based on battery level (using both % and voltage)
         val color = when {
-            data.batteryPercentage <= 10 -> getColor(R.color.battery_critical)
-            data.batteryPercentage <= 20 -> getColor(R.color.battery_low)
-            data.batteryPercentage <= 40 -> getColor(R.color.battery_medium)
+            data.batteryPercentage <= criticalPercent || data.voltage <= criticalVoltage -> getColor(R.color.battery_critical)
+            data.batteryPercentage <= warningPercent || data.voltage <= warningVoltage -> getColor(R.color.battery_warning)
             else -> getColor(R.color.battery_good)
         }
         binding.tvBatteryPercent.setTextColor(color)
+        binding.tvVoltage.setTextColor(color)
         
         // Additional metrics
         binding.tvSpeed.text = String.format("%.0f", data.speed)
@@ -302,11 +324,21 @@ class MainActivity : AppCompatActivity() {
         // Update app trip meters
         updateTripMeters()
         
-        // Wheel info - Line 1 of main HUD display
-        if (data.wheelModel.isNotEmpty()) {
-            binding.tvWheelName.text = data.wheelModel
+        // Wheel info - Line 1 of main HUD display (LEFT side - wheel model/status)
+        if (data.isConnected) {
+            // Wheel is connected to EUC World - show model name
+            if (data.wheelModel.isNotEmpty()) {
+                binding.tvWheelName.text = data.wheelModel
+            } else {
+                binding.tvWheelName.text = getString(R.string.wheel_connected)
+            }
+            // Normal background for battery card
+            binding.cardBattery.setCardBackgroundColor(getColor(R.color.background_card))
         } else {
-            binding.tvWheelName.text = getString(R.string.wheel_unknown)
+            // Wheel is disconnected from EUC World - show disconnected status
+            binding.tvWheelName.text = getString(R.string.wheel_disconnected)
+            // Light red background for battery card when disconnected
+            binding.cardBattery.setCardBackgroundColor(getColor(R.color.background_card_warning))
         }
     }
     
@@ -329,7 +361,9 @@ class MainActivity : AppCompatActivity() {
     private fun updateUIDisconnected() {
         binding.tvBatteryPercent.text = "--"
         binding.tvVoltage.text = "---"
+        // Keep battery text grey when disconnected (no color warnings)
         binding.tvBatteryPercent.setTextColor(getColor(R.color.text_disabled))
+        binding.tvVoltage.setTextColor(getColor(R.color.text_disabled))
         
         binding.tvSpeed.text = "--"
         binding.tvTemperature.text = "--"
@@ -339,7 +373,10 @@ class MainActivity : AppCompatActivity() {
         binding.tvTripDistance.text = "--"
         binding.tvTotalDistance.text = "--"
         
-        binding.tvWheelName.text = getString(R.string.not_connected)
+        binding.tvWheelName.text = getString(R.string.wheel_disconnected)
+        
+        // Light red background for battery card when disconnected
+        binding.cardBattery.setCardBackgroundColor(getColor(R.color.background_card_warning))
         
         // Keep trip meters showing their values (they persist)
         updateTripMeters()
@@ -347,16 +384,16 @@ class MainActivity : AppCompatActivity() {
     
     private fun updateConnectionStatus(state: ConnectionState) {
         val statusText = when (state) {
-            ConnectionState.DISCONNECTED -> getString(R.string.status_disconnected)
-            ConnectionState.CONNECTING -> getString(R.string.status_connecting)
-            ConnectionState.CONNECTED -> getString(R.string.status_connected)
-            ConnectionState.WHEEL_DISCONNECTED -> getString(R.string.status_wheel_disconnected)
-            ConnectionState.ERROR -> getString(R.string.status_error)
+            ConnectionState.DISCONNECTED -> getString(R.string.status_app_disconnected)
+            ConnectionState.CONNECTING -> getString(R.string.status_app_connecting)
+            ConnectionState.CONNECTED -> getString(R.string.status_app_connected)
+            ConnectionState.WHEEL_DISCONNECTED -> getString(R.string.status_app_no_wheel)
+            ConnectionState.ERROR -> getString(R.string.status_app_error)
         }
         binding.tvConnectionStatus.text = statusText
         
         val statusColor = when (state) {
-            ConnectionState.CONNECTED -> getColor(R.color.status_connected)
+            ConnectionState.CONNECTED, ConnectionState.WHEEL_DISCONNECTED -> getColor(R.color.status_connected)
             ConnectionState.CONNECTING -> getColor(R.color.status_connecting)
             else -> getColor(R.color.status_disconnected)
         }
@@ -374,5 +411,52 @@ class MainActivity : AppCompatActivity() {
             // Show message that OsmAnd is not installed
             binding.tvConnectionStatus.text = getString(R.string.osmand_not_installed)
         }
+    }
+    
+    /**
+     * Show confirmation dialog before resetting a trip meter
+     */
+    private fun showResetTripConfirmation(tripMeter: TripMeterManager.TripMeter) {
+        val tripName = when (tripMeter) {
+            TripMeterManager.TripMeter.A -> "Trip A"
+            TripMeterManager.TripMeter.B -> "Trip B"
+            TripMeterManager.TripMeter.C -> "Trip C"
+        }
+        
+        AlertDialog.Builder(this)
+            .setTitle("Reset $tripName?")
+            .setMessage("This will reset $tripName to start tracking from the current odometer reading.")
+            .setPositiveButton("Reset") { _, _ ->
+                tripMeterManager.resetTrip(tripMeter, currentOdometer)
+                updateTripMeters()
+                eucService?.triggerImmediateBroadcast()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+    
+    /**
+     * Show confirmation dialog before clearing all trips
+     */
+    private fun showClearAllTripsConfirmation() {
+        val (tripA, tripB, tripC) = tripMeterManager.getAllTripDistances(currentOdometer)
+        val message = buildString {
+            append("This will clear all trip meters:\n\n")
+            append("Trip A: ${formatTripDistance(tripA)} km\n")
+            append("Trip B: ${formatTripDistance(tripB)} km\n")
+            append("Trip C: ${formatTripDistance(tripC)} km\n\n")
+            append("This action cannot be undone.")
+        }
+        
+        AlertDialog.Builder(this)
+            .setTitle("Clear All Trips?")
+            .setMessage(message)
+            .setPositiveButton("Clear All") { _, _ ->
+                tripMeterManager.clearAllTrips()
+                updateTripMeters()
+                eucService?.triggerImmediateBroadcast()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 }

@@ -1,63 +1,39 @@
 ===============================================================================
-EUC World for OsmAnd - Release Notes v1.1.8
-Build 12 - Released 2026-02-19
+EUC World for OsmAnd - Release Notes
+Version 1.1.9 (Build 13)
+Release Date: 2026-02-19
+Build Date: 2026-02-19 11:35:54
 ===============================================================================
 
-COPY AND PASTE THIS INTO PLAY CONSOLE:
-===============================================================================
+CHANGES IN THIS RELEASE:
+------------------------
+• chore: Bump version to 1.1.9 (code 13)
+• feat: Improve UI with layout fixes and map icon settings
 
-Bug fixes and improvements:
-• Fixed settings screen crash on Android 15
-• Added version information and GitHub link in settings
-• Updated to latest Android development tools for better stability
-• Improved UI layout to prevent status bar overlay issues
-• Excluded tablets, Chromebooks, and XR devices from Play Store listing
 
 ===============================================================================
-
-ALTERNATIVE VERSION (if the above exceeds character limit):
+PLAY STORE RELEASE NOTES (500 character limit):
 ===============================================================================
 
-• Fixed settings crash on Android 15
-• Added app info and GitHub link in settings
-• Better Android 15 compatibility
-• Now targeting phones only
-• UI improvements and bug fixes
+UI improvements and bug fixes:
+• Improved main screen layout with better spacing below title bar
+• Changed battery icon to map icon for clearer functionality
+• Added setting to show/hide map icon in title bar
+• Cleaner disconnected state display
+• Fixed Play Store compatibility issues
+• General UI polish and improvements
+
+===============================================================================
+SHORT CHANGELOG:
+===============================================================================
+
+• Improved main screen layout spacing
+• Replaced battery icon with map icon in title bar
+• Added option to hide/show map icon
+• Simplified disconnected state text display
+• Fixed device compatibility declarations for Play Store
 
 ===============================================================================
 
-DETAILED CHANGELOG (for reference):
-===============================================================================
+NOTE: Edit RELEASE_NOTES.txt to customize the Play Store release notes section.
 
-BUG FIXES:
-----------
-• Fixed crash when opening Settings screen on Android 15 devices
-• Resolved status bar overlay issue where content appeared under system bars
-• Fixed ActionBar compatibility issues with modern Android versions
-
-NEW FEATURES:
--------------
-• Added "About" section in Settings showing:
-  - App version and build code
-  - Build date and time
-  - Copyright information
-  - Clickable link to GitHub project for bug reports and source code
-
-DEVICE COMPATIBILITY:
----------------------
-• App now exclusively targets Android phones (handheld devices only)
-• Removed from Play Store for:
-  - Tablets (large/xlarge screens)
-  - Chromebooks (Chrome OS devices)
-  - Google XR devices (AR/VR headsets)
-  - Watches, TVs, and Automotive displays
-
-TECHNICAL IMPROVEMENTS:
------------------------
-• Upgraded Android Gradle Plugin from 8.2.2 to 8.7.3
-• Upgraded Gradle wrapper from 8.4 to 8.9
-• Full Android 15 (API level 35) support
-• Enabled BuildConfig for better version tracking
-• Improved app stability on latest Android versions
-
-===============================================================================

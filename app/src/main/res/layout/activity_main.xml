@@ -23,6 +23,7 @@
 
         <!-- Main Battery Display - HUD Style -->
         <androidx.cardview.widget.CardView
+            android:id="@+id/cardBattery"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
@@ -331,6 +332,7 @@
                         android:gravity="center">
 
                         <TextView
+                            android:id="@+id/tvLabelTripA"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/trip_a"
@@ -354,6 +356,7 @@
                         android:gravity="center">
 
                         <TextView
+                            android:id="@+id/tvLabelTripB"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/trip_b"
@@ -377,6 +380,7 @@
                         android:gravity="center">
 
                         <TextView
+                            android:id="@+id/tvLabelTripC"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/trip_c"

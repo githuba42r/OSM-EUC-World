@@ -19,12 +19,19 @@
     <string name="launch_osmand">Open OsmAnd</string>
     
     <!-- Status -->
-    <string name="status_disconnected">EUC World: Disconnected</string>
-    <string name="status_connecting">EUC World: Connecting...</string>
-    <string name="status_connected">Wheel: Connected</string>
-    <string name="status_wheel_disconnected">Disconnected</string>
-    <string name="status_error">Connection Error</string>
-    <string name="not_connected">Not Connected</string>
+    <string name="status_app_disconnected">App: Disconnected</string>
+    <string name="status_app_connecting">App: Connecting...</string>
+    <string name="status_app_connected">App: Connected</string>
+    <string name="status_app_no_wheel">App: Connected</string>
+    <string name="status_app_error">App: Error</string>
+    <string name="status_disconnected">App: Disconnected</string>
+    <string name="status_connecting">App: Connecting...</string>
+    <string name="status_connected">Connected</string>
+    <string name="status_wheel_disconnected">App: No Wheel</string>
+    <string name="status_error">App: Error</string>
+    <string name="not_connected">Wheel Disconnected</string>
+    <string name="wheel_connected">Connected</string>
+    <string name="wheel_disconnected">Disconnected</string>
     <string name="wheel_unknown">--</string>
     <string name="osmand_not_installed">OsmAnd is not installed</string>
     
@@ -66,6 +73,14 @@
     <string name="settings_use_metric_summary">Display speed in km/h and temperature in Celsius</string>
     <string name="settings_show_battery_icon">Show Map Icon in Title Bar</string>
     <string name="settings_show_battery_icon_summary">Display map icon button that opens OsmAnd in the app title bar</string>
+    <string name="settings_battery_warning_percent">Battery Warning %</string>
+    <string name="settings_battery_warning_percent_summary">Show yellow warning when battery drops below this percentage</string>
+    <string name="settings_battery_critical_percent">Battery Critical %</string>
+    <string name="settings_battery_critical_percent_summary">Show red alert when battery drops below this percentage</string>
+    <string name="settings_battery_warning_voltage">Battery Warning Voltage</string>
+    <string name="settings_battery_warning_voltage_summary">Show yellow warning when voltage drops below this value</string>
+    <string name="settings_battery_critical_voltage">Battery Critical Voltage</string>
+    <string name="settings_battery_critical_voltage_summary">Show red alert when voltage drops below this value</string>
     <string name="settings_category_android_auto">Android Auto</string>
     <string name="settings_android_auto_update_interval">Display Update Interval</string>
     <string name="settings_android_auto_update_interval_summary">How often to refresh Android Auto display (seconds). Higher values save battery.</string>

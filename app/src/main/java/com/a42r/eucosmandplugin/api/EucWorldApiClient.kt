@@ -196,8 +196,21 @@ class EucWorldApiClient(
         val totalDistance = getDouble(KEY_TOTAL_DISTANCE)
         val wheelModel = getString(KEY_MODEL)
         
-        // Consider connected if we have valid battery data
-        val isConnected = batteryPercent > 0 || voltage > 0
+        // The "a" field in EUC World API contains a timestamp
+        // When CONNECTED: a = small number (milliseconds since connection, e.g., 6, 825, 967)
+        // When DISCONNECTED: a = large Unix timestamp (e.g., 1771476453040)
+        // 
+        // A Unix timestamp for 2026 is ~1735689600000 (Jan 1, 2026)
+        // If 'a' is less than 1 billion, it's a relative timestamp (connected)
+        // If 'a' is greater than 1 billion, it's an absolute Unix timestamp (disconnected)
+        val batteryTimestamp = valueMap[KEY_BATTERY_PERCENT]?.a ?: 
+                              valueMap[KEY_BATTERY_FULL]?.a ?: 
+                              Long.MAX_VALUE
+        
+        // Consider connected if we have battery data AND timestamp is relative (< 1 billion)
+        val hasBatteryData = batteryPercent > 0 || voltage > 0
+        val hasRecentConnection = batteryTimestamp < 1_000_000_000L
+        val isConnected = hasBatteryData && hasRecentConnection
         
         Log.d(TAG, "Parsed: battery=$batteryPercent%, voltage=${voltage}V, speed=$speed, model=$wheelModel, connected=$isConnected")
         
@@ -288,6 +301,6 @@ data class EucValueItem(
     val w: String? = null,
     val l: Boolean? = null,
     val t: Int? = null,
-    val a: Int? = null,
+    val a: Long? = null,
     val s: String? = null
 )
