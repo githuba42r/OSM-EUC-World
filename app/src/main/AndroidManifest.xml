@@ -10,19 +10,44 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
-    <!-- Device restrictions: Handhelds only (exclude tablets and Chromebooks) -->
+    <!-- Device restrictions: Handhelds only (exclude tablets, Chromebooks, and XR devices) -->
     <uses-feature
         android:name="android.hardware.telephony"
         android:required="false" />
     <uses-feature
         android:name="android.hardware.touchscreen"
         android:required="true" />
+    
+    <!-- Exclude Chromebooks -->
+    <uses-feature
+        android:name="android.hardware.type.pc"
+        android:required="false" />
+    <uses-feature
+        android:name="org.chromium.arc"
+        android:required="false" />
+    
+    <!-- Exclude Google XR devices -->
+    <uses-feature
+        android:name="android.hardware.xr.headtracking"
+        android:required="false" />
+    
     <!-- Exclude tablets by requiring small/normal screen sizes -->
     <supports-screens
         android:smallScreens="true"
         android:normalScreens="true"
         android:largeScreens="false"
         android:xlargeScreens="false" />
+    
+    <!-- Explicitly exclude devices without handheld form factor -->
+    <uses-feature
+        android:name="android.hardware.type.watch"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.type.television"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.type.automotive"
+        android:required="false" />
 
     <!-- Package visibility for OsmAnd detection (required Android 11+) -->
     <queries>
