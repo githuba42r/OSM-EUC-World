@@ -34,6 +34,9 @@ android {
         versionName "${versionMajor}.${versionMinor}.${versionPatch}"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        
+        // Add build timestamp
+        buildConfigField "String", "BUILD_DATE", "\"${new Date().format('yyyy-MM-dd HH:mm:ss')}\""
     }
 
     signingConfigs {
@@ -69,6 +72,7 @@ android {
     buildFeatures {
         viewBinding true
         aidl true
+        buildConfig true
     }
 }
 
