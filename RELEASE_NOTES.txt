@@ -1,0 +1,62 @@
+===============================================================================
+EUC World for OsmAnd - Release Notes
+Version 1.1.8 (Build 11)
+Release Date: 2026-02-19
+===============================================================================
+
+BUG FIXES:
+----------
+• Fixed settings screen crash on Android 15 devices
+• Resolved status bar overlay issue where UI content appeared under system bars
+• Fixed ActionBar compatibility with modern Android versions
+
+
+NEW FEATURES:
+-------------
+• Added "About" section in Settings showing:
+  - App version and build code
+  - Build date and time
+  - Copyright notice
+  - Clickable GitHub project link for reporting issues and viewing source code
+
+
+DEVICE COMPATIBILITY:
+---------------------
+• App now exclusively targets Android phones (handheld devices)
+• Excluded from Play Store listing:
+  - Tablets (large/xlarge screens)
+  - Chromebooks (Chrome OS devices)
+  - Google XR devices (AR/VR headsets)
+  - Watches, TVs, and Automotive displays
+
+
+TECHNICAL IMPROVEMENTS:
+-----------------------
+• Upgraded Android Gradle Plugin from 8.2.2 to 8.7.3
+• Upgraded Gradle from 8.4 to 8.9
+• Full Android 15 (API 35) support
+• Enabled BuildConfig for better version tracking
+• Improved app stability on latest Android versions
+
+
+===============================================================================
+PLAY STORE RELEASE NOTES (500 character limit):
+===============================================================================
+
+Bug fixes and improvements:
+• Fixed settings screen crash on Android 15
+• Added version information and GitHub link in settings
+• Updated to latest Android development tools for better stability
+• Improved UI layout to prevent status bar overlay issues
+• General performance improvements
+
+===============================================================================
+SHORT CHANGELOG:
+===============================================================================
+
+• Fixed app crashes when opening settings
+• Added app information section in settings
+• Improved compatibility with Android 15
+• Minor bug fixes and stability improvements
+
+===============================================================================

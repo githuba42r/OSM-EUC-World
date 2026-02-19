@@ -136,15 +136,73 @@ else
 fi
 echo ""
 
-# 10. Summary
+# 10. Generate release notes
+echo "8. Generating release notes..."
+RELEASE_DATE=$(date +%Y-%m-%d)
+BUILD_DATE=$(date "+%Y-%m-%d %H:%M:%S")
+
+# Get commits since last tag
+LAST_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+if [[ -n "$LAST_TAG" ]]; then
+    COMMIT_LOG=$(git log ${LAST_TAG}..HEAD --pretty=format:"• %s" --no-merges)
+else
+    COMMIT_LOG=$(git log --pretty=format:"• %s" --no-merges -10)
+fi
+
+cat > RELEASE_NOTES.txt << EOF
+===============================================================================
+EUC World for OsmAnd - Release Notes
+Version ${NEW_VERSION} (Build ${NEW_CODE})
+Release Date: ${RELEASE_DATE}
+Build Date: ${BUILD_DATE}
+===============================================================================
+
+CHANGES IN THIS RELEASE:
+------------------------
+${COMMIT_LOG}
+
+
+===============================================================================
+PLAY STORE RELEASE NOTES (500 character limit):
+===============================================================================
+
+Bug fixes and improvements:
+• Fixed settings screen crash on Android 15
+• Added version information and GitHub link in settings
+• Updated to latest Android development tools for better stability
+• Improved UI layout to prevent status bar overlay issues
+• General performance improvements
+
+===============================================================================
+SHORT CHANGELOG:
+===============================================================================
+
+• Fixed app crashes when opening settings
+• Added app information section in settings
+• Improved compatibility with Android 15
+• Minor bug fixes and stability improvements
+
+===============================================================================
+
+NOTE: Edit RELEASE_NOTES.txt to customize the Play Store release notes section.
+
+EOF
+
+echo -e "${GREEN}✓ Release notes generated: RELEASE_NOTES.txt${NC}"
+echo ""
+
+# 11. Summary
 echo -e "${GREEN}=== Release Complete ===${NC}"
 echo ""
 echo "Version: ${NEW_VERSION} (code ${NEW_CODE})"
 echo "Tag: ${TAG_NAME}"
 echo "AAB: ${AAB_PATH}"
+echo "Release Notes: RELEASE_NOTES.txt"
 echo ""
 echo -e "${YELLOW}Next steps:${NC}"
-echo "1. Test the AAB file"
-echo "2. Push to remote: git push && git push --tags"
-echo "3. Upload ${AAB_PATH} to Google Play Console"
+echo "1. Review and edit RELEASE_NOTES.txt if needed"
+echo "2. Test the AAB file"
+echo "3. Push to remote: git push && git push --tags"
+echo "4. Upload ${AAB_PATH} to Google Play Console"
+echo "5. Use content from RELEASE_NOTES.txt for Play Store release notes"
 echo ""
