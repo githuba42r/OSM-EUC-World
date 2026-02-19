@@ -22,10 +22,10 @@
     <string name="status_disconnected">EUC World: Disconnected</string>
     <string name="status_connecting">EUC World: Connecting...</string>
     <string name="status_connected">Wheel: Connected</string>
-    <string name="status_wheel_disconnected">Wheel: Disconnected</string>
+    <string name="status_wheel_disconnected">Disconnected</string>
     <string name="status_error">Connection Error</string>
     <string name="not_connected">Not Connected</string>
-    <string name="wheel_unknown">Unknown Wheel</string>
+    <string name="wheel_unknown">--</string>
     <string name="osmand_not_installed">OsmAnd is not installed</string>
     
     <!-- Labels -->
@@ -64,6 +64,8 @@
     <string name="settings_category_display">Display</string>
     <string name="settings_use_metric">Use Metric Units</string>
     <string name="settings_use_metric_summary">Display speed in km/h and temperature in Celsius</string>
+    <string name="settings_show_battery_icon">Show Map Icon in Title Bar</string>
+    <string name="settings_show_battery_icon_summary">Display map icon button that opens OsmAnd in the app title bar</string>
     <string name="settings_category_android_auto">Android Auto</string>
     <string name="settings_android_auto_update_interval">Display Update Interval</string>
     <string name="settings_android_auto_update_interval_summary">How often to refresh Android Auto display (seconds). Higher values save battery.</string>

@@ -65,6 +65,13 @@
             android:defaultValue="true"
             app:iconSpaceReserved="false" />
 
+        <SwitchPreferenceCompat
+            android:key="show_battery_icon"
+            android:title="@string/settings_show_battery_icon"
+            android:summary="@string/settings_show_battery_icon_summary"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+
     </PreferenceCategory>
 
     <PreferenceCategory

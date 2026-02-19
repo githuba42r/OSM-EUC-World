@@ -18,6 +18,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.preference.PreferenceManager
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import com.a42r.eucosmandplugin.R
@@ -86,6 +87,12 @@ class MainActivity : AppCompatActivity() {
         bindToService()
     }
     
+    override fun onResume() {
+        super.onResume()
+        // Recreate options menu to reflect settings changes
+        invalidateOptionsMenu()
+    }
+    
     override fun onStop() {
         super.onStop()
         unbindFromService()
@@ -93,6 +100,12 @@ class MainActivity : AppCompatActivity() {
     
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
+        
+        // Hide battery icon if preference is set
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        val showBatteryIcon = prefs.getBoolean("show_battery_icon", true)
+        menu.findItem(R.id.action_launch_osmand)?.isVisible = showBatteryIcon
+        
         return true
     }
     
