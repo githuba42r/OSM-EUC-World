@@ -1,21 +1,9 @@
 ===============================================================================
-EUC World for OsmAnd - Release Notes
-Version 1.1.8 (Build 11)
-Release Date: 2026-02-19
-Build Date: 2026-02-19 10:47:34
+EUC World for OsmAnd - Release Notes v1.1.8
+Build 11 - Released 2026-02-19
 ===============================================================================
 
-CHANGES IN THIS RELEASE:
-------------------------
-• feat: Add automatic release notes generation
-• feat: Exclude tablets, Chromebooks, and Google XR devices
-• chore: Bump version to 1.1.8 (code 11)
-• feat: Upgrade AGP to 8.7.3, fix settings crash, add about section
-• docs: Add comprehensive release process documentation
-
-
-===============================================================================
-PLAY STORE RELEASE NOTES (500 character limit):
+COPY AND PASTE THIS INTO PLAY CONSOLE:
 ===============================================================================
 
 Bug fixes and improvements:
@@ -26,16 +14,50 @@ Bug fixes and improvements:
 • Excluded tablets, Chromebooks, and XR devices from Play Store listing
 
 ===============================================================================
-SHORT CHANGELOG:
+
+ALTERNATIVE VERSION (if the above exceeds character limit):
 ===============================================================================
 
-• Fixed app crashes when opening settings
-• Added app information section in settings  
-• Improved compatibility with Android 15
-• Restricted app to phone devices only
-• Minor bug fixes and stability improvements
+• Fixed settings crash on Android 15
+• Added app info and GitHub link in settings
+• Better Android 15 compatibility
+• Now targeting phones only
+• UI improvements and bug fixes
 
 ===============================================================================
 
-For detailed technical changes, see git commit history from v1.1.7 to v1.1.8
+DETAILED CHANGELOG (for reference):
+===============================================================================
 
+BUG FIXES:
+----------
+• Fixed crash when opening Settings screen on Android 15 devices
+• Resolved status bar overlay issue where content appeared under system bars
+• Fixed ActionBar compatibility issues with modern Android versions
+
+NEW FEATURES:
+-------------
+• Added "About" section in Settings showing:
+  - App version and build code
+  - Build date and time
+  - Copyright information
+  - Clickable link to GitHub project for bug reports and source code
+
+DEVICE COMPATIBILITY:
+---------------------
+• App now exclusively targets Android phones (handheld devices only)
+• Removed from Play Store for:
+  - Tablets (large/xlarge screens)
+  - Chromebooks (Chrome OS devices)
+  - Google XR devices (AR/VR headsets)
+  - Watches, TVs, and Automotive displays
+
+TECHNICAL IMPROVEMENTS:
+-----------------------
+• Upgraded Android Gradle Plugin from 8.2.2 to 8.7.3
+• Upgraded Gradle wrapper from 8.4 to 8.9
+• Full Android 15 (API level 35) support
+• Enabled BuildConfig for better version tracking
+• Improved app stability on latest Android versions
+
+===============================================================================
