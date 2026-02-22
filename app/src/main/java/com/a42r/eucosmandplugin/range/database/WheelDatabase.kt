@@ -283,6 +283,18 @@ object WheelDatabase {
             ),
             releaseYear = 2020
         ),
+        WheelSpec(
+            displayName = "InMotion V11Y",
+            modelIdentifiers = listOf("V11Y", "InMotion V11Y"),
+            manufacturer = "InMotion",
+            batteryConfig = BatteryConfig(
+                cellCount = 24,
+                capacityWh = 1800.0,
+                nominalVoltage = 100.8,
+                parallelPacks = 1
+            ),
+            releaseYear = 2020
+        ),
         
         // V Series (20S)
         WheelSpec(
@@ -298,12 +310,50 @@ object WheelDatabase {
             releaseYear = 2018
         ),
         WheelSpec(
+            displayName = "InMotion V10",
+            modelIdentifiers = listOf("V10", "InMotion V10"),
+            manufacturer = "InMotion",
+            batteryConfig = BatteryConfig(
+                cellCount = 20,
+                capacityWh = 650.0,
+                nominalVoltage = 84.0,
+                parallelPacks = 1
+            ),
+            releaseYear = 2018
+        ),
+        
+        // V Series (16S)
+        WheelSpec(
+            displayName = "InMotion V8F",
+            modelIdentifiers = listOf("V8F", "InMotion V8F"),
+            manufacturer = "InMotion",
+            batteryConfig = BatteryConfig(
+                cellCount = 16,
+                capacityWh = 518.0,
+                nominalVoltage = 67.2,
+                parallelPacks = 1
+            ),
+            releaseYear = 2018
+        ),
+        WheelSpec(
             displayName = "InMotion V8",
             modelIdentifiers = listOf("V8", "InMotion V8"),
             manufacturer = "InMotion",
             batteryConfig = BatteryConfig(
                 cellCount = 16,
                 capacityWh = 480.0,
+                nominalVoltage = 67.2,
+                parallelPacks = 1
+            ),
+            releaseYear = 2017
+        ),
+        WheelSpec(
+            displayName = "InMotion V8S",
+            modelIdentifiers = listOf("V8S", "InMotion V8S"),
+            manufacturer = "InMotion",
+            batteryConfig = BatteryConfig(
+                cellCount = 16,
+                capacityWh = 320.0,
                 nominalVoltage = 67.2,
                 parallelPacks = 1
             ),
@@ -366,6 +416,30 @@ object WheelDatabase {
         
         // 16 Series (20S)
         WheelSpec(
+            displayName = "KingSong 18XL",
+            modelIdentifiers = listOf("18XL", "KS-18XL", "KingSong 18XL"),
+            manufacturer = "KingSong",
+            batteryConfig = BatteryConfig(
+                cellCount = 20,
+                capacityWh = 1554.0,
+                nominalVoltage = 84.0,
+                parallelPacks = 1
+            ),
+            releaseYear = 2019
+        ),
+        WheelSpec(
+            displayName = "KingSong 18L",
+            modelIdentifiers = listOf("18L", "KS-18L", "KingSong 18L"),
+            manufacturer = "KingSong",
+            batteryConfig = BatteryConfig(
+                cellCount = 20,
+                capacityWh = 1036.0,
+                nominalVoltage = 84.0,
+                parallelPacks = 1
+            ),
+            releaseYear = 2018
+        ),
+        WheelSpec(
             displayName = "KingSong 16X",
             modelIdentifiers = listOf("16X", "KS-16X", "KingSong 16X"),
             manufacturer = "KingSong",
@@ -421,7 +495,7 @@ object WheelDatabase {
         ),
         WheelSpec(
             displayName = "Veteran Sherman",
-            modelIdentifiers = listOf("Sherman", "Veteran Sherman"),
+            modelIdentifiers = listOf("Sherman", "Sherman S", "Veteran Sherman"),
             manufacturer = "Veteran",
             batteryConfig = BatteryConfig(
                 cellCount = 24,

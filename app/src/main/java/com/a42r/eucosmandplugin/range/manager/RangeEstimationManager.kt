@@ -163,11 +163,13 @@ class RangeEstimationManager(
      * Initialize estimators with current settings.
      */
     private fun initializeEstimators() {
-        // Read battery capacity (stored as int in preferences)
-        val batteryCapacity = prefs.getInt(PREF_BATTERY_CAPACITY_WH, DEFAULT_BATTERY_CAPACITY.toInt()).toDouble()
+        // Read battery capacity (can be stored as String or Int in preferences)
+        val batteryCapacity = prefs.getString(PREF_BATTERY_CAPACITY_WH, null)?.toDoubleOrNull()
+            ?: prefs.getInt(PREF_BATTERY_CAPACITY_WH, DEFAULT_BATTERY_CAPACITY.toInt()).toDouble()
         
-        // Read cell count (stored as int in preferences)
-        val cellCount = prefs.getInt(PREF_CELL_COUNT, DEFAULT_CELL_COUNT)
+        // Read cell count (can be stored as String or Int in preferences)
+        val cellCount = prefs.getString(PREF_CELL_COUNT, null)?.toIntOrNull()
+            ?: prefs.getInt(PREF_CELL_COUNT, DEFAULT_CELL_COUNT)
         
         simpleLinearEstimator = SimpleLinearEstimator(
             batteryCapacityWh = batteryCapacity,
@@ -571,6 +573,8 @@ class RangeEstimationManager(
      * Get cell count from settings.
      */
     private fun getCellCount(): Int {
-        return prefs.getInt(PREF_CELL_COUNT, DEFAULT_CELL_COUNT)
+        // Can be stored as String or Int in preferences
+        return prefs.getString(PREF_CELL_COUNT, null)?.toIntOrNull()
+            ?: prefs.getInt(PREF_CELL_COUNT, DEFAULT_CELL_COUNT)
     }
 }
