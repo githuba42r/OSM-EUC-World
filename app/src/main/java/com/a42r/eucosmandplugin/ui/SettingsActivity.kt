@@ -67,6 +67,10 @@ class SettingsActivity : AppCompatActivity() {
         }
         
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+            // Migrate Int preferences to String for EditTextPreference compatibility
+            // This is needed because auto-detection saves as Int, but EditTextPreference requires String
+            migrateIntPreferencesToString()
+            
             setPreferencesFromResource(R.xml.preferences, rootKey)
             
             // API Host preference
@@ -245,6 +249,40 @@ class SettingsActivity : AppCompatActivity() {
                 putInt("battery_cell_count", wheelSpec.batteryConfig.cellCount)
                 apply()
             }
+        }
+        
+        /**
+         * Migrate Int preferences to String for EditTextPreference compatibility.
+         * Auto-detection saves battery_capacity_wh and battery_cell_count as Int,
+         * but EditTextPreference requires String values.
+         */
+        private fun migrateIntPreferencesToString() {
+            val prefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(requireContext())
+            val editor = prefs.edit()
+            
+            // Migrate battery_capacity_wh if it's stored as Int
+            try {
+                val capacityInt = prefs.getInt("battery_capacity_wh", -1)
+                if (capacityInt != -1) {
+                    editor.remove("battery_capacity_wh")
+                    editor.putString("battery_capacity_wh", capacityInt.toString())
+                }
+            } catch (e: ClassCastException) {
+                // Already a String, no migration needed
+            }
+            
+            // Migrate battery_cell_count if it's stored as Int
+            try {
+                val cellCountInt = prefs.getInt("battery_cell_count", -1)
+                if (cellCountInt != -1) {
+                    editor.remove("battery_cell_count")
+                    editor.putString("battery_cell_count", cellCountInt.toString())
+                }
+            } catch (e: ClassCastException) {
+                // Already a String, no migration needed
+            }
+            
+            editor.apply()
         }
         
         private fun showResetRangeTripDialog() {
