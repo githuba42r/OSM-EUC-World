@@ -218,6 +218,72 @@ object WheelDatabase {
             releaseYear = 2020
         ),
         
+        // MSX Series (20S)
+        WheelSpec(
+            displayName = "Begode MSX",
+            modelIdentifiers = listOf("MSX", "Begode MSX", "Gotway MSX"),
+            manufacturer = "Begode",
+            batteryConfig = BatteryConfig(
+                cellCount = 20,
+                capacityWh = 1845.0,
+                nominalVoltage = 84.0,
+                parallelPacks = 1
+            ),
+            releaseYear = 2018
+        ),
+        WheelSpec(
+            displayName = "Begode MSP",
+            modelIdentifiers = listOf("MSP", "Begode MSP", "Gotway MSP"),
+            manufacturer = "Begode",
+            batteryConfig = BatteryConfig(
+                cellCount = 20,
+                capacityWh = 1845.0,
+                nominalVoltage = 84.0,
+                parallelPacks = 1
+            ),
+            releaseYear = 2019
+        ),
+        
+        // Nikola Series (20S)
+        WheelSpec(
+            displayName = "Begode Nikola",
+            modelIdentifiers = listOf("Nikola", "Begode Nikola", "Gotway Nikola"),
+            manufacturer = "Begode",
+            batteryConfig = BatteryConfig(
+                cellCount = 20,
+                capacityWh = 1800.0,
+                nominalVoltage = 84.0,
+                parallelPacks = 1
+            ),
+            releaseYear = 2019
+        ),
+        WheelSpec(
+            displayName = "Begode Nikola+",
+            modelIdentifiers = listOf("Nikola+", "Nikola Plus", "Begode Nikola+", "Gotway Nikola+"),
+            manufacturer = "Begode",
+            batteryConfig = BatteryConfig(
+                cellCount = 20,
+                capacityWh = 1800.0,
+                nominalVoltage = 84.0,
+                parallelPacks = 1
+            ),
+            releaseYear = 2020
+        ),
+        
+        // Tesla Series (20S)
+        WheelSpec(
+            displayName = "Begode Tesla v2",
+            modelIdentifiers = listOf("Tesla", "Tesla v2", "Begode Tesla", "Gotway Tesla"),
+            manufacturer = "Begode",
+            batteryConfig = BatteryConfig(
+                cellCount = 20,
+                capacityWh = 1020.0,
+                nominalVoltage = 84.0,
+                parallelPacks = 1
+            ),
+            releaseYear = 2017
+        ),
+        
         // ===== INMOTION =====
         
         // V Series (30S - 126V)
@@ -413,6 +479,32 @@ object WheelDatabase {
             ),
             releaseYear = 2020
         ),
+        WheelSpec(
+            displayName = "KingSong S16 Pro",
+            modelIdentifiers = listOf("S16 Pro", "S16Pro", "KS-S16 Pro", "KingSong S16 Pro"),
+            manufacturer = "KingSong",
+            batteryConfig = BatteryConfig(
+                cellCount = 24,
+                capacityWh = 1200.0,
+                nominalVoltage = 100.8,
+                parallelPacks = 1
+            ),
+            releaseYear = 2021
+        ),
+        
+        // S Series (20S)
+        WheelSpec(
+            displayName = "KingSong S16",
+            modelIdentifiers = listOf("S16", "KS-S16", "KingSong S16"),
+            manufacturer = "KingSong",
+            batteryConfig = BatteryConfig(
+                cellCount = 20,
+                capacityWh = 960.0,
+                nominalVoltage = 84.0,
+                parallelPacks = 1
+            ),
+            releaseYear = 2019
+        ),
         
         // 16 Series (20S)
         WheelSpec(
@@ -506,6 +598,32 @@ object WheelDatabase {
             releaseYear = 2021
         ),
         
+        // Commander Series (36S/40S - High Voltage)
+        WheelSpec(
+            displayName = "Veteran Commander Pro",
+            modelIdentifiers = listOf("Commander Pro", "Veteran Commander Pro"),
+            manufacturer = "Veteran",
+            batteryConfig = BatteryConfig(
+                cellCount = 40,
+                capacityWh = 4200.0,
+                nominalVoltage = 168.0,
+                parallelPacks = 1
+            ),
+            releaseYear = 2024
+        ),
+        WheelSpec(
+            displayName = "Veteran Commander",
+            modelIdentifiers = listOf("Commander", "Veteran Commander"),
+            manufacturer = "Veteran",
+            batteryConfig = BatteryConfig(
+                cellCount = 36,
+                capacityWh = 3500.0,
+                nominalVoltage = 151.2,
+                parallelPacks = 1
+            ),
+            releaseYear = 2023
+        ),
+        
         // Patton Series (24S)
         WheelSpec(
             displayName = "Veteran Patton",
@@ -536,6 +654,18 @@ object WheelDatabase {
         
         // ===== LEAPERKIM =====
         
+        WheelSpec(
+            displayName = "Leaperkim Lynx HS",
+            modelIdentifiers = listOf("Lynx HS", "LynxHS", "Leaperkim Lynx HS"),
+            manufacturer = "Leaperkim",
+            batteryConfig = BatteryConfig(
+                cellCount = 30,
+                capacityWh = 3240.0,
+                nominalVoltage = 126.0,
+                parallelPacks = 1
+            ),
+            releaseYear = 2023
+        ),
         WheelSpec(
             displayName = "Leaperkim Lynx",
             modelIdentifiers = listOf("Lynx", "Leaperkim Lynx"),
