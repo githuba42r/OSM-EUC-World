@@ -204,13 +204,20 @@ class SettingsActivity : AppCompatActivity() {
         
         private fun updateDetectedWheelInfo(wheelSpec: WheelDatabase.WheelSpec? = null, unknownModel: String? = null) {
             findPreference<Preference>("detected_wheel_info")?.apply {
-                if (wheelSpec != null) {
-                    title = wheelSpec.displayName
+                // If no wheelSpec provided, try to load from SharedPreferences
+                val effectiveWheelSpec = wheelSpec ?: run {
+                    val prefs = preferenceManager.sharedPreferences
+                    val savedModel = prefs?.getString("selected_wheel_model", null)
+                    savedModel?.let { WheelDatabase.findWheelSpec(it) }
+                }
+                
+                if (effectiveWheelSpec != null) {
+                    title = effectiveWheelSpec.displayName
                     summary = getString(
                         R.string.settings_detected_wheel_summary,
-                        wheelSpec.manufacturer,
-                        wheelSpec.batteryConfig.capacityWh.toInt(),
-                        wheelSpec.batteryConfig.getConfigString()
+                        effectiveWheelSpec.manufacturer,
+                        effectiveWheelSpec.batteryConfig.capacityWh.toInt(),
+                        effectiveWheelSpec.batteryConfig.getConfigString()
                     )
                 } else if (unknownModel != null) {
                     title = unknownModel
