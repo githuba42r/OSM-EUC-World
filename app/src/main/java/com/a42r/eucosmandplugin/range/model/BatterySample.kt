@@ -90,7 +90,7 @@ enum class SampleFlag {
     DISTANCE_ANOMALY,
     
     /** Battery increased (charging event detected) */
-    CHARGING_EVENT,
+    CHARGING_DETECTED,
     
     /** Voltage reading outside expected range (e.g., <60V or >84V for 20S) */
     VOLTAGE_ANOMALY,
@@ -99,5 +99,8 @@ enum class SampleFlag {
     EFFICIENCY_OUTLIER,
     
     /** Speed sensor error (e.g., sudden spike to unrealistic speed) */
-    SPEED_ANOMALY
+    SPEED_ANOMALY,
+    
+    /** Interpolated sample (created during connection gap) */
+    INTERPOLATED
 }

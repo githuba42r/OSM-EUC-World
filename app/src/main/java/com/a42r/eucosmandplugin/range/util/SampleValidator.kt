@@ -32,7 +32,7 @@ object SampleValidator {
             
             // Battery state checks
             if (detectChargingEvent(currentSample, previousSample)) {
-                flags.add(SampleFlag.CHARGING_EVENT)
+                flags.add(SampleFlag.CHARGING_DETECTED)
             }
             
             // Speed sensor checks
