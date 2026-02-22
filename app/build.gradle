@@ -119,7 +119,7 @@ play {
     track.set('internal')
     
     // Release status (use DRAFT for apps not yet published, COMPLETED for published apps)
-    releaseStatus.set(com.github.triplet.gradle.androidpublisher.ReleaseStatus.COMPLETED)
+    releaseStatus.set(com.github.triplet.gradle.androidpublisher.ReleaseStatus.DRAFT)
     
     // Default to bundle (AAB) instead of APK
     defaultToAppBundles.set(true)
