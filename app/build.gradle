@@ -1,6 +1,7 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
+    id 'com.github.triplet.play'
 }
 
 // Load version from version.properties
@@ -14,6 +15,8 @@ def versionMajor = (versionProps['VERSION_MAJOR'] ?: '1').toInteger()
 def versionMinor = (versionProps['VERSION_MINOR'] ?: '0').toInteger()
 def versionPatch = (versionProps['VERSION_PATCH'] ?: '0').toInteger()
 def versionCodeNum = (versionProps['VERSION_CODE'] ?: '1').toInteger()
+def versionPrerelease = versionProps['VERSION_PRERELEASE'] ?: ''
+def appVersionName = versionPrerelease ? "${versionMajor}.${versionMinor}.${versionPatch}-${versionPrerelease}" : "${versionMajor}.${versionMinor}.${versionPatch}"
 
 // Load keystore properties
 def keystorePropertiesFile = rootProject.file('keystore.properties')
@@ -31,7 +34,7 @@ android {
         minSdk 26
         targetSdk 35
         versionCode versionCodeNum
-        versionName "${versionMajor}.${versionMinor}.${versionPatch}"
+        versionName appVersionName
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         
@@ -101,4 +104,23 @@ dependencies {
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+}
+
+// Google Play Publisher configuration
+play {
+    // Path to your service account JSON key file
+    // Download from Google Play Console -> API Access -> Service Accounts
+    def serviceAccountFile = rootProject.file('play-service-account.json')
+    if (serviceAccountFile.exists()) {
+        serviceAccountCredentials.set(serviceAccountFile)
+    }
+    
+    // Track to publish to (internal, alpha, beta, production)
+    track.set('internal')
+    
+    // Release status (use DRAFT for apps not yet published, COMPLETED for published apps)
+    releaseStatus.set(com.github.triplet.gradle.androidpublisher.ReleaseStatus.COMPLETED)
+    
+    // Default to bundle (AAB) instead of APK
+    defaultToAppBundles.set(true)
 }
