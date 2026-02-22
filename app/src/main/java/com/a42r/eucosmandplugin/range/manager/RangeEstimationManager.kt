@@ -164,12 +164,20 @@ class RangeEstimationManager(
      */
     private fun initializeEstimators() {
         // Read battery capacity (can be stored as String or Int in preferences)
-        val batteryCapacity = prefs.getString(PREF_BATTERY_CAPACITY_WH, null)?.toDoubleOrNull()
-            ?: prefs.getInt(PREF_BATTERY_CAPACITY_WH, DEFAULT_BATTERY_CAPACITY.toInt()).toDouble()
+        // Try Int first, then String (to avoid ClassCastException)
+        val batteryCapacity = try {
+            prefs.getInt(PREF_BATTERY_CAPACITY_WH, -1).takeIf { it != -1 }?.toDouble()
+        } catch (e: ClassCastException) {
+            prefs.getString(PREF_BATTERY_CAPACITY_WH, null)?.toDoubleOrNull()
+        } ?: DEFAULT_BATTERY_CAPACITY
         
         // Read cell count (can be stored as String or Int in preferences)
-        val cellCount = prefs.getString(PREF_CELL_COUNT, null)?.toIntOrNull()
-            ?: prefs.getInt(PREF_CELL_COUNT, DEFAULT_CELL_COUNT)
+        // Try Int first, then String (to avoid ClassCastException)
+        val cellCount = try {
+            prefs.getInt(PREF_CELL_COUNT, -1).takeIf { it != -1 }
+        } catch (e: ClassCastException) {
+            prefs.getString(PREF_CELL_COUNT, null)?.toIntOrNull()
+        } ?: DEFAULT_CELL_COUNT
         
         simpleLinearEstimator = SimpleLinearEstimator(
             batteryCapacityWh = batteryCapacity,
@@ -574,7 +582,11 @@ class RangeEstimationManager(
      */
     private fun getCellCount(): Int {
         // Can be stored as String or Int in preferences
-        return prefs.getString(PREF_CELL_COUNT, null)?.toIntOrNull()
-            ?: prefs.getInt(PREF_CELL_COUNT, DEFAULT_CELL_COUNT)
+        // Try Int first, then String (to avoid ClassCastException)
+        return try {
+            prefs.getInt(PREF_CELL_COUNT, -1).takeIf { it != -1 }
+        } catch (e: ClassCastException) {
+            prefs.getString(PREF_CELL_COUNT, null)?.toIntOrNull()
+        } ?: DEFAULT_CELL_COUNT
     }
 }
