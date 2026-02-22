@@ -60,6 +60,11 @@ class RangeEstimationManager(
         private const val CHARGING_BATTERY_INCREASE_THRESHOLD = 1.0 // %
         private const val CHARGING_DISTANCE_CHANGE_THRESHOLD = 0.01 // km
         
+        // Estimation update intervals based on battery level
+        private const val ESTIMATION_UPDATE_INTERVAL_HIGH_BATTERY_MS = 5 * 60 * 1000L // 5 minutes for top 50% battery
+        private const val ESTIMATION_UPDATE_INTERVAL_LOW_BATTERY_MS = 1 * 60 * 1000L // 1 minute for bottom 50% battery
+        private const val BATTERY_THRESHOLD_PERCENT = 50.0 // Threshold for switching update intervals
+        
         // Settings keys
         private const val PREF_RANGE_ENABLED = "range_estimation_enabled"
         private const val PREF_WHEEL_CONFIG_MODE = "wheel_config_mode"
@@ -79,6 +84,9 @@ class RangeEstimationManager(
     private var tripSnapshot = TripSnapshot.createInitial()
     private var lastSample: BatterySample? = null
     private var previousCompensatedVoltage: Double? = null
+    
+    // Estimation update throttling
+    private var lastEstimationTimestamp: Long = 0L
     
     // Charging detection state machine
     private enum class ChargingState {
@@ -147,6 +155,7 @@ class RangeEstimationManager(
         tripSnapshot = TripSnapshot.createInitial()
         lastSample = null
         previousCompensatedVoltage = null
+        lastEstimationTimestamp = 0L
         chargingState = ChargingState.NOT_CHARGING
         chargingSuspectedSample = null
         _rangeEstimate.value = null
@@ -205,7 +214,7 @@ class RangeEstimationManager(
      * 5. Detect and handle charging events
      * 6. Validate and flag sample
      * 7. Add to trip state
-     * 8. Run estimation algorithm
+     * 8. Run estimation algorithm (throttled based on battery level)
      * 9. Emit RangeEstimate
      */
     private fun processSample(eucData: EucData) {
@@ -251,14 +260,57 @@ class RangeEstimationManager(
         // Step 7: Add to trip state
         addSampleToTrip(validatedSample)
         
-        // Step 8: Run estimation algorithm
-        val estimate = runEstimation()
+        // Step 8: Determine if we should run estimation based on battery level and time since last estimation
+        val shouldRunEstimation = shouldRunEstimation(currentTimestamp, sample.batteryPercent)
         
-        // Step 9: Emit estimate
-        _rangeEstimate.value = estimate
+        if (shouldRunEstimation) {
+            // Run estimation algorithm
+            val estimate = runEstimation()
+            
+            // Emit estimate
+            _rangeEstimate.value = estimate
+            
+            // Update last estimation timestamp
+            lastEstimationTimestamp = currentTimestamp
+        }
         
         // Update state for next iteration
         lastSample = validatedSample
+    }
+    
+    /**
+     * Determine if we should run estimation based on battery level and time since last estimation.
+     * 
+     * Rules:
+     * - Top 50% battery: Update every 5 minutes
+     * - Bottom 50% battery: Update every 1 minute
+     * - Always run on first sample or when no estimate exists yet
+     * - Always run when collecting initial data (before minimum requirements met)
+     */
+    private fun shouldRunEstimation(currentTimestamp: Long, batteryPercent: Double): Boolean {
+        // Always run on first sample
+        if (lastEstimationTimestamp == 0L) {
+            return true
+        }
+        
+        // Check if we have an estimate yet - if not, run frequently to provide progress updates
+        val currentEstimate = _rangeEstimate.value
+        if (currentEstimate == null || currentEstimate.status == EstimateStatus.INSUFFICIENT_DATA) {
+            // Run every 10 seconds while collecting initial data to show progress
+            val timeSinceLastEstimation = currentTimestamp - lastEstimationTimestamp
+            return timeSinceLastEstimation >= 10000L
+        }
+        
+        // Determine update interval based on battery level
+        val updateInterval = if (batteryPercent >= BATTERY_THRESHOLD_PERCENT) {
+            ESTIMATION_UPDATE_INTERVAL_HIGH_BATTERY_MS
+        } else {
+            ESTIMATION_UPDATE_INTERVAL_LOW_BATTERY_MS
+        }
+        
+        // Check if enough time has passed since last estimation
+        val timeSinceLastEstimation = currentTimestamp - lastEstimationTimestamp
+        return timeSinceLastEstimation >= updateInterval
     }
     
     /**

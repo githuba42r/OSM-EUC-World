@@ -372,37 +372,76 @@ class MainActivity : AppCompatActivity() {
         
         binding.cardRangeEstimate.visibility = View.VISIBLE
         
-        val rangeEstimate = eucService?.getCurrentRangeEstimate()
-        val confidence = eucService?.getRangeEstimationConfidence()
+        val estimate = eucService?.getFullRangeEstimate()
         
-        if (rangeEstimate != null && confidence != null) {
-            // Show range estimate
-            val useMetric = prefs.getBoolean("use_metric", true)
-            val rangeValue = if (useMetric) rangeEstimate else rangeEstimate * 0.621371
-            val unit = if (useMetric) "km" else "mi"
-            
-            binding.tvRangeEstimate.text = String.format("%.1f %s", rangeValue, unit)
-            
-            // Show confidence level
-            val confidenceText = when {
-                confidence >= 0.8 -> getString(R.string.range_confidence_high)
-                confidence >= 0.5 -> getString(R.string.range_confidence_medium)
-                else -> getString(R.string.range_confidence_low)
-            }
-            binding.tvRangeConfidence.text = confidenceText
-            
-            // Color based on confidence
-            val color = when {
-                confidence >= 0.8 -> getColor(R.color.battery_good)
-                confidence >= 0.5 -> getColor(R.color.battery_warning)
-                else -> getColor(R.color.text_secondary)
-            }
-            binding.tvRangeEstimate.setTextColor(color)
-        } else {
-            // Insufficient data
+        if (estimate == null) {
+            // No estimate available yet
             binding.tvRangeEstimate.text = "-- km"
             binding.tvRangeEstimate.setTextColor(getColor(R.color.text_disabled))
             binding.tvRangeConfidence.text = getString(R.string.range_collecting_data)
+            return
+        }
+        
+        // Handle different estimate statuses
+        when (estimate.status) {
+            com.a42r.eucosmandplugin.range.model.EstimateStatus.CHARGING -> {
+                binding.tvRangeEstimate.text = "-- km"
+                binding.tvRangeEstimate.setTextColor(getColor(R.color.text_disabled))
+                binding.tvRangeConfidence.text = getString(R.string.range_charging)
+            }
+            
+            com.a42r.eucosmandplugin.range.model.EstimateStatus.INSUFFICIENT_DATA -> {
+                // Show progress toward requirements
+                val dataQuality = estimate.dataQuality
+                val timeProgress = String.format("%.1f/10 min", dataQuality.travelTimeMinutes)
+                val distanceProgress = String.format("%.1f/10 km", dataQuality.travelDistanceKm)
+                
+                binding.tvRangeEstimate.text = "$timeProgress, $distanceProgress"
+                binding.tvRangeEstimate.setTextColor(getColor(R.color.text_secondary))
+                binding.tvRangeConfidence.text = getString(R.string.range_collecting_data)
+            }
+            
+            com.a42r.eucosmandplugin.range.model.EstimateStatus.VALID,
+            com.a42r.eucosmandplugin.range.model.EstimateStatus.LOW_CONFIDENCE -> {
+                // Show range estimate
+                val rangeKm = estimate.rangeKm
+                if (rangeKm != null) {
+                    val useMetric = prefs.getBoolean("use_metric", true)
+                    val rangeValue = if (useMetric) rangeKm else rangeKm * 0.621371
+                    val unit = if (useMetric) "km" else "mi"
+                    
+                    binding.tvRangeEstimate.text = String.format("%.1f %s", rangeValue, unit)
+                    
+                    // Show confidence level
+                    val confidence = estimate.confidence
+                    val confidenceText = when {
+                        confidence >= 0.8 -> getString(R.string.range_confidence_high)
+                        confidence >= 0.5 -> getString(R.string.range_confidence_medium)
+                        else -> getString(R.string.range_confidence_low)
+                    }
+                    binding.tvRangeConfidence.text = confidenceText
+                    
+                    // Color based on confidence
+                    val color = when {
+                        confidence >= 0.8 -> getColor(R.color.battery_good)
+                        confidence >= 0.5 -> getColor(R.color.battery_warning)
+                        else -> getColor(R.color.text_secondary)
+                    }
+                    binding.tvRangeEstimate.setTextColor(color)
+                } else {
+                    // Shouldn't happen for VALID status, but handle gracefully
+                    binding.tvRangeEstimate.text = "-- km"
+                    binding.tvRangeEstimate.setTextColor(getColor(R.color.text_disabled))
+                    binding.tvRangeConfidence.text = getString(R.string.range_collecting_data)
+                }
+            }
+            
+            else -> {
+                // COLLECTING, STALE, or unknown status
+                binding.tvRangeEstimate.text = "-- km"
+                binding.tvRangeEstimate.setTextColor(getColor(R.color.text_disabled))
+                binding.tvRangeConfidence.text = getString(R.string.range_collecting_data)
+            }
         }
     }
     

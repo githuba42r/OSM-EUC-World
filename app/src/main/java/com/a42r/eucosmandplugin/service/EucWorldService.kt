@@ -483,6 +483,13 @@ class EucWorldService : LifecycleService() {
     }
     
     /**
+     * Get the full RangeEstimate object with status and data quality
+     */
+    fun getFullRangeEstimate(): com.a42r.eucosmandplugin.range.model.RangeEstimate? {
+        return rangeEstimationManager?.rangeEstimate?.value
+    }
+    
+    /**
      * Reload range estimation settings (call this when settings change)
      */
     fun reloadRangeEstimationSettings() {
