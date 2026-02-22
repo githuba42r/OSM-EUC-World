@@ -259,6 +259,63 @@
 
         </androidx.cardview.widget.CardView>
 
+        <!-- Range Estimation Card -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/cardRangeEstimate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="6dp"
+            android:visibility="gone"
+            style="@style/CardStyle">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="8dp">
+
+                <!-- Header -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Range Estimate"
+                    android:layout_marginBottom="4dp"
+                    style="@style/TextStyle.Label" />
+
+                <!-- Range Value -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:id="@+id/tvRangeEstimate"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="-- km"
+                        android:textSize="32sp"
+                        android:textColor="@color/text_primary"
+                        android:gravity="center" />
+
+                </LinearLayout>
+
+                <!-- Confidence/Status -->
+                <TextView
+                    android:id="@+id/tvRangeConfidence"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Collecting data..."
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginTop="2dp"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary" />
+
+            </LinearLayout>
+
+        </androidx.cardview.widget.CardView>
+
         <!-- App Trip Meters (A/B/C) -->
         <androidx.cardview.widget.CardView
             android:layout_width="match_parent"

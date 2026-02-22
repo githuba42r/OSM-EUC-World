@@ -107,6 +107,65 @@
     </PreferenceCategory>
 
     <PreferenceCategory
+        android:title="@string/settings_category_range_estimation"
+        app:iconSpaceReserved="false">
+
+        <SwitchPreferenceCompat
+            android:key="range_estimation_enabled"
+            android:title="@string/settings_range_estimation_enabled"
+            android:summary="@string/settings_range_estimation_enabled_summary"
+            android:defaultValue="false"
+            app:iconSpaceReserved="false" />
+
+        <EditTextPreference
+            android:key="battery_capacity_wh"
+            android:title="@string/settings_battery_capacity"
+            android:summary="@string/settings_battery_capacity_summary"
+            android:defaultValue="2000"
+            android:inputType="number"
+            android:dependency="range_estimation_enabled"
+            app:iconSpaceReserved="false" />
+
+        <ListPreference
+            android:key="battery_cell_count"
+            android:title="@string/settings_battery_cell_count"
+            android:summary="@string/settings_battery_cell_count_summary"
+            android:entries="@array/battery_cell_count_entries"
+            android:entryValues="@array/battery_cell_count_values"
+            android:defaultValue="20"
+            android:dependency="range_estimation_enabled"
+            app:iconSpaceReserved="false" />
+
+        <ListPreference
+            android:key="range_estimation_algorithm"
+            android:title="@string/settings_range_algorithm"
+            android:summary="@string/settings_range_algorithm_summary"
+            android:entries="@array/range_estimation_algorithm_entries"
+            android:entryValues="@array/range_estimation_algorithm_values"
+            android:defaultValue="weighted_window"
+            android:dependency="range_estimation_enabled"
+            app:iconSpaceReserved="false" />
+
+        <ListPreference
+            android:key="range_estimation_preset"
+            android:title="@string/settings_range_preset"
+            android:summary="@string/settings_range_preset_summary"
+            android:entries="@array/range_estimation_preset_entries"
+            android:entryValues="@array/range_estimation_preset_values"
+            android:defaultValue="balanced"
+            android:dependency="range_estimation_enabled"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="reset_range_trip"
+            android:title="@string/settings_reset_range_trip"
+            android:summary="@string/settings_reset_range_trip_summary"
+            android:dependency="range_estimation_enabled"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
         android:title="@string/settings_category_android_auto"
         app:iconSpaceReserved="false">
 

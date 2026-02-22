@@ -49,6 +49,10 @@ class EucWorldScreen(carContext: CarContext) : Screen(carContext) {
     private val tripMeterManager = TripMeterManager(carContext)
     private var currentOdometer: Double = 0.0
     
+    // Range estimation data
+    private var rangeEstimateKm: Double? = null
+    private var rangeConfidence: Double? = null
+    
     // Throttling: track last template data to avoid unnecessary updates
     private var lastUpdateTime: Long = 0
     private var lastBatteryPercentage: Int? = null
@@ -84,6 +88,15 @@ class EucWorldScreen(carContext: CarContext) : Screen(carContext) {
                             }
                             // Store odometer for trip calculations
                             currentOdometer = data.totalDistance
+                            
+                            // Extract range estimation data if available
+                            rangeEstimateKm = if (bundle.containsKey("range_estimate_km")) {
+                                bundle.getDouble("range_estimate_km")
+                            } else null
+                            
+                            rangeConfidence = if (bundle.containsKey("range_confidence")) {
+                                bundle.getDouble("range_confidence")
+                            } else null
                             
                             // Update connection state based on actual wheel connection
                             connectionState = if (data.isConnected) {
@@ -261,7 +274,30 @@ class EucWorldScreen(carContext: CarContext) : Screen(carContext) {
                 .build()
         )
         
-        // Row 3: Trip meters display
+        // Row 3: Range Estimate (if available)
+        val prefs = PreferenceManager.getDefaultSharedPreferences(carContext)
+        val rangeEnabled = prefs.getBoolean("range_estimation_enabled", false)
+        
+        if (rangeEnabled && rangeEstimateKm != null && rangeConfidence != null) {
+            val useMetric = prefs.getBoolean("use_metric", true)
+            val rangeValue = if (useMetric) rangeEstimateKm!! else rangeEstimateKm!! * 0.621371
+            val unit = if (useMetric) "km" else "mi"
+            
+            val confidenceText = when {
+                rangeConfidence!! >= 0.8 -> "High confidence"
+                rangeConfidence!! >= 0.5 -> "Medium confidence"
+                else -> "Low confidence"
+            }
+            
+            paneBuilder.addRow(
+                Row.Builder()
+                    .setTitle("Range Estimate")
+                    .addText(String.format("%.1f %s (%s)", rangeValue, unit, confidenceText))
+                    .build()
+            )
+        }
+        
+        // Row 4: Trip meters display
         val (tripA, tripB, tripC) = tripMeterManager.getAllTripDistances(currentOdometer)
         val tripLine = "A: ${formatTripDistance(tripA)} km  •  B: ${formatTripDistance(tripB)} km  •  C: ${formatTripDistance(tripC)} km"
         

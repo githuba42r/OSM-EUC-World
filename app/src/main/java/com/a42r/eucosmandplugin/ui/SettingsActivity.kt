@@ -1,8 +1,11 @@
 package com.a42r.eucosmandplugin.ui
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference
@@ -90,6 +93,38 @@ class SettingsActivity : AppCompatActivity() {
                     true
                 }
             }
+            
+            // Reset range trip preference
+            findPreference<Preference>("reset_range_trip")?.apply {
+                setOnPreferenceClickListener {
+                    showResetRangeTripDialog()
+                    true
+                }
+            }
+        }
+        
+        private fun showResetRangeTripDialog() {
+            AlertDialog.Builder(requireContext())
+                .setTitle(R.string.reset_range_trip_title)
+                .setMessage(R.string.reset_range_trip_message)
+                .setPositiveButton(android.R.string.ok) { _, _ ->
+                    resetRangeTripData()
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
+        
+        private fun resetRangeTripData() {
+            // Clear range estimation data from SharedPreferences
+            val prefs = requireContext().getSharedPreferences("range_estimation_data", Context.MODE_PRIVATE)
+            prefs.edit().clear().apply()
+            
+            // Show confirmation
+            Toast.makeText(
+                requireContext(),
+                R.string.reset_range_trip_success,
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 }

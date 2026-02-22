@@ -324,6 +324,9 @@ class MainActivity : AppCompatActivity() {
         // Update app trip meters
         updateTripMeters()
         
+        // Update range estimation display
+        updateRangeEstimation()
+        
         // Wheel info - Line 1 of main HUD display (LEFT side - wheel model/status)
         if (data.isConnected) {
             // Wheel is connected to EUC World - show model name
@@ -355,6 +358,51 @@ class MainActivity : AppCompatActivity() {
             String.format("%.1f", distance)
         } else {
             "--"
+        }
+    }
+    
+    private fun updateRangeEstimation() {
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        val rangeEnabled = prefs.getBoolean("range_estimation_enabled", false)
+        
+        if (!rangeEnabled) {
+            binding.cardRangeEstimate.visibility = View.GONE
+            return
+        }
+        
+        binding.cardRangeEstimate.visibility = View.VISIBLE
+        
+        val rangeEstimate = eucService?.getCurrentRangeEstimate()
+        val confidence = eucService?.getRangeEstimationConfidence()
+        
+        if (rangeEstimate != null && confidence != null) {
+            // Show range estimate
+            val useMetric = prefs.getBoolean("use_metric", true)
+            val rangeValue = if (useMetric) rangeEstimate else rangeEstimate * 0.621371
+            val unit = if (useMetric) "km" else "mi"
+            
+            binding.tvRangeEstimate.text = String.format("%.1f %s", rangeValue, unit)
+            
+            // Show confidence level
+            val confidenceText = when {
+                confidence >= 0.8 -> getString(R.string.range_confidence_high)
+                confidence >= 0.5 -> getString(R.string.range_confidence_medium)
+                else -> getString(R.string.range_confidence_low)
+            }
+            binding.tvRangeConfidence.text = confidenceText
+            
+            // Color based on confidence
+            val color = when {
+                confidence >= 0.8 -> getColor(R.color.battery_good)
+                confidence >= 0.5 -> getColor(R.color.battery_warning)
+                else -> getColor(R.color.text_secondary)
+            }
+            binding.tvRangeEstimate.setTextColor(color)
+        } else {
+            // Insufficient data
+            binding.tvRangeEstimate.text = "-- km"
+            binding.tvRangeEstimate.setTextColor(getColor(R.color.text_disabled))
+            binding.tvRangeConfidence.text = getString(R.string.range_collecting_data)
         }
     }
     

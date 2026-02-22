@@ -85,6 +85,33 @@
     <string name="settings_android_auto_update_interval">Display Update Interval</string>
     <string name="settings_android_auto_update_interval_summary">How often to refresh Android Auto display (seconds). Higher values save battery.</string>
     
+    <!-- Range Estimation Settings -->
+    <string name="settings_category_range_estimation">Range Estimation</string>
+    <string name="settings_range_estimation_enabled">Enable Range Estimation</string>
+    <string name="settings_range_estimation_enabled_summary">Calculate remaining range based on battery usage patterns</string>
+    <string name="settings_battery_capacity">Battery Capacity (Wh)</string>
+    <string name="settings_battery_capacity_summary">Total battery capacity in watt-hours (e.g., 2000 for 2kWh)</string>
+    <string name="settings_battery_cell_count">Battery Cell Count</string>
+    <string name="settings_battery_cell_count_summary">Number of battery cells in series (e.g., 20S for 84V wheel)</string>
+    <string name="settings_range_algorithm">Estimation Algorithm</string>
+    <string name="settings_range_algorithm_summary">Choose the calculation method</string>
+    <string name="settings_range_preset">Estimation Preset</string>
+    <string name="settings_range_preset_summary">Choose conservative, balanced, or responsive estimation</string>
+    <string name="settings_reset_range_trip">Reset Range Trip Data</string>
+    <string name="settings_reset_range_trip_summary">Clear all collected trip data and restart estimation</string>
+    <string name="reset_range_trip_title">Reset Range Trip?</string>
+    <string name="reset_range_trip_message">This will clear all collected trip data. Range estimation will restart from scratch. Continue?</string>
+    <string name="reset_range_trip_success">Range trip data has been reset</string>
+    
+    <!-- Range Estimation Display -->
+    <string name="range_estimate">Range Estimate</string>
+    <string name="range_collecting_data">Collecting data...</string>
+    <string name="range_insufficient_data">Insufficient data (need %1$s)</string>
+    <string name="range_confidence_low">Low confidence</string>
+    <string name="range_confidence_medium">Medium confidence</string>
+    <string name="range_confidence_high">High confidence</string>
+    <string name="range_charging">Charging</string>
+    
     <!-- Widget -->
     <string name="widget_name">EUC Battery Status</string>
     <string name="widget_description">Shows EUC battery percentage and voltage</string>

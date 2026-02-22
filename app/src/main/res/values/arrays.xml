@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Range Estimation Algorithm Options -->
+    <string-array name="range_estimation_algorithm_entries">
+        <item>Simple Linear</item>
+        <item>Weighted Window (Recommended)</item>
+    </string-array>
+    
+    <string-array name="range_estimation_algorithm_values">
+        <item>simple_linear</item>
+        <item>weighted_window</item>
+    </string-array>
+    
+    <!-- Range Estimation Preset Options -->
+    <string-array name="range_estimation_preset_entries">
+        <item>Conservative (More buffer)</item>
+        <item>Balanced (Recommended)</item>
+        <item>Responsive (Latest data)</item>
+    </string-array>
+    
+    <string-array name="range_estimation_preset_values">
+        <item>conservative</item>
+        <item>balanced</item>
+        <item>responsive</item>
+    </string-array>
+    
+    <!-- Battery Cell Count Options -->
+    <string-array name="battery_cell_count_entries">
+        <item>16S (67.2V nominal)</item>
+        <item>20S (84V nominal)</item>
+        <item>24S (100.8V nominal)</item>
+    </string-array>
+    
+    <string-array name="battery_cell_count_values">
+        <item>16</item>
+        <item>20</item>
+        <item>24</item>
+    </string-array>
+</resources>

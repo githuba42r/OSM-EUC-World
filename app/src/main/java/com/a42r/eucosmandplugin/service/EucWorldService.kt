@@ -29,6 +29,7 @@ import com.a42r.eucosmandplugin.R
 import com.a42r.eucosmandplugin.api.EucData
 import com.a42r.eucosmandplugin.api.EucWidgetData
 import com.a42r.eucosmandplugin.api.EucWorldApiClient
+import com.a42r.eucosmandplugin.range.manager.RangeEstimationManager
 import com.a42r.eucosmandplugin.ui.MainActivity
 import com.a42r.eucosmandplugin.util.TripMeterManager
 
@@ -96,6 +97,12 @@ class EucWorldService : LifecycleService() {
     // Trip meter manager for app trips
     private lateinit var tripMeterManager: TripMeterManager
     
+    // Range estimation manager
+    private var rangeEstimationManager: RangeEstimationManager? = null
+    
+    // Range estimation enabled state
+    private var rangeEstimationEnabled = false
+    
     // Receiver for trip meter change broadcasts
     private val tripMeterChangeReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -121,6 +128,9 @@ class EucWorldService : LifecycleService() {
         
         // Initialize trip meter manager
         tripMeterManager = TripMeterManager(this)
+        
+        // Initialize range estimation if enabled
+        initializeRangeEstimation()
         
         // Register receiver for trip meter changes
         val filter = IntentFilter(TripMeterManager.ACTION_TRIP_METER_CHANGED)
@@ -207,6 +217,9 @@ class EucWorldService : LifecycleService() {
                             // Update notification with current data
                             updateNotification(data)
                             
+                            // Update range estimation
+                            updateRangeEstimation(data)
+                            
                             // Broadcast update to widgets and OsmAnd
                             broadcastUpdate(data)
                         },
@@ -262,6 +275,10 @@ class EucWorldService : LifecycleService() {
             // Get trip distances
             val (tripA, tripB, tripC) = tripMeterManager.getAllTripDistances(data.totalDistance)
             
+            // Get range estimate if available
+            val rangeEstimate = getCurrentRangeEstimate()
+            val rangeConfidence = getRangeEstimationConfidence()
+            
             val intent = Intent(AutoProxyReceiver.ACTION_EUC_DATA_UPDATE).apply {
                 setPackage(packageName)
                 putExtras(AutoProxyReceiver.createDataBundle(data))
@@ -272,6 +289,13 @@ class EucWorldService : LifecycleService() {
                 putExtra(AutoProxyReceiver.EXTRA_TRIP_A_ACTIVE, tripMeterManager.isTripActive(TripMeterManager.TripMeter.A))
                 putExtra(AutoProxyReceiver.EXTRA_TRIP_B_ACTIVE, tripMeterManager.isTripActive(TripMeterManager.TripMeter.B))
                 putExtra(AutoProxyReceiver.EXTRA_TRIP_C_ACTIVE, tripMeterManager.isTripActive(TripMeterManager.TripMeter.C))
+                // Add range estimation data
+                if (rangeEstimate != null) {
+                    putExtra("range_estimate_km", rangeEstimate)
+                }
+                if (rangeConfidence != null) {
+                    putExtra("range_confidence", rangeConfidence)
+                }
             }
             sendBroadcast(intent)
         }
@@ -414,5 +438,54 @@ class EucWorldService : LifecycleService() {
     fun getWidgetData(): EucWidgetData {
         return _eucDataState.value?.let { EucWidgetData.fromEucData(it) }
             ?: EucWidgetData.disconnected()
+    }
+    
+    /**
+     * Initialize range estimation manager based on settings
+     */
+    private fun initializeRangeEstimation() {
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        rangeEstimationEnabled = prefs.getBoolean("range_estimation_enabled", false)
+        
+        if (rangeEstimationEnabled) {
+            rangeEstimationManager = RangeEstimationManager(
+                context = this,
+                scope = lifecycleScope
+            )
+            
+            // Start the manager with the EucData StateFlow
+            rangeEstimationManager?.start(eucDataState)
+        } else {
+            rangeEstimationManager?.stop()
+            rangeEstimationManager = null
+        }
+    }
+    
+    /**
+     * Update range estimation - handled automatically by manager observing eucDataState
+     */
+    private fun updateRangeEstimation(data: EucData) {
+        // No-op: RangeEstimationManager observes eucDataState directly
+    }
+    
+    /**
+     * Get current range estimate (in km), or null if not available
+     */
+    fun getCurrentRangeEstimate(): Double? {
+        return rangeEstimationManager?.rangeEstimate?.value?.rangeKm
+    }
+    
+    /**
+     * Get range estimation confidence (0.0 to 1.0), or null if not available
+     */
+    fun getRangeEstimationConfidence(): Double? {
+        return rangeEstimationManager?.rangeEstimate?.value?.confidence
+    }
+    
+    /**
+     * Reload range estimation settings (call this when settings change)
+     */
+    fun reloadRangeEstimationSettings() {
+        initializeRangeEstimation()
     }
 }
