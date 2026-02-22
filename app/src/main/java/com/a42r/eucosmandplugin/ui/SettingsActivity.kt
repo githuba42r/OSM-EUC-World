@@ -2,20 +2,27 @@ package com.a42r.eucosmandplugin.ui
 
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.content.BroadcastReceiver
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.preference.EditTextPreference
+import androidx.preference.ListPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.SeekBarPreference
 import androidx.preference.SwitchPreferenceCompat
 import com.a42r.eucosmandplugin.BuildConfig
 import com.a42r.eucosmandplugin.R
+import com.a42r.eucosmandplugin.api.EucData
 import com.a42r.eucosmandplugin.api.EucWorldApiClient
 import com.a42r.eucosmandplugin.databinding.ActivitySettingsBinding
+import com.a42r.eucosmandplugin.range.database.WheelDatabase
+import com.a42r.eucosmandplugin.service.AutoProxyReceiver
 
 /**
  * Settings activity for configuring the EUC World plugin.
@@ -48,7 +55,16 @@ class SettingsActivity : AppCompatActivity() {
         return true
     }
     
-    class SettingsFragment : PreferenceFragmentCompat() {
+    class SettingsFragment : PreferenceFragmentCompat(), WheelModelSelectorDialog.WheelSelectionListener {
+        
+        private val eucDataReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                intent?.extras?.let { bundle ->
+                    val data = AutoProxyReceiver.parseDataBundle(bundle)
+                    handleWheelDetection(data)
+                }
+            }
+        }
         
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             setPreferencesFromResource(R.xml.preferences, rootKey)
@@ -94,12 +110,140 @@ class SettingsActivity : AppCompatActivity() {
                 }
             }
             
+            // Wheel configuration mode
+            findPreference<ListPreference>("wheel_config_mode")?.apply {
+                setOnPreferenceChangeListener { _, newValue ->
+                    updateWheelConfigUI(newValue as String)
+                    true
+                }
+                updateWheelConfigUI(value ?: "auto")
+            }
+            
+            // Wheel model selector
+            findPreference<Preference>("wheel_model_selector")?.apply {
+                setOnPreferenceClickListener {
+                    showWheelModelSelector()
+                    true
+                }
+            }
+            
             // Reset range trip preference
             findPreference<Preference>("reset_range_trip")?.apply {
                 setOnPreferenceClickListener {
                     showResetRangeTripDialog()
                     true
                 }
+            }
+            
+            // Update detected wheel info
+            updateDetectedWheelInfo()
+        }
+        
+        override fun onResume() {
+            super.onResume()
+            // Register for EUC data broadcasts
+            LocalBroadcastManager.getInstance(requireContext()).registerReceiver(
+                eucDataReceiver,
+                IntentFilter(AutoProxyReceiver.ACTION_EUC_DATA_UPDATE)
+            )
+        }
+        
+        override fun onPause() {
+            super.onPause()
+            LocalBroadcastManager.getInstance(requireContext()).unregisterReceiver(eucDataReceiver)
+        }
+        
+        private fun handleWheelDetection(data: EucData) {
+            val configMode = preferenceManager.sharedPreferences?.getString("wheel_config_mode", "auto") ?: "auto"
+            
+            if (configMode == "auto" && data.wheelModel.isNotBlank()) {
+                val wheelSpec = WheelDatabase.findWheelSpec(data.wheelModel)
+                
+                if (wheelSpec != null) {
+                    // Auto-detected wheel found in database
+                    saveWheelConfig(wheelSpec)
+                    updateDetectedWheelInfo(wheelSpec)
+                } else {
+                    // Wheel connected but not in database
+                    updateDetectedWheelInfo(null, data.wheelModel)
+                }
+            }
+        }
+        
+        private fun updateWheelConfigUI(mode: String) {
+            val detectedWheelPref = findPreference<Preference>("detected_wheel_info")
+            val modelSelectorPref = findPreference<Preference>("wheel_model_selector")
+            val capacityPref = findPreference<EditTextPreference>("battery_capacity_wh")
+            val cellCountPref = findPreference<ListPreference>("battery_cell_count")
+            
+            when (mode) {
+                "auto" -> {
+                    detectedWheelPref?.isVisible = true
+                    modelSelectorPref?.isVisible = false
+                    capacityPref?.isVisible = false
+                    cellCountPref?.isVisible = false
+                }
+                "database" -> {
+                    detectedWheelPref?.isVisible = false
+                    modelSelectorPref?.isVisible = true
+                    capacityPref?.isVisible = false
+                    cellCountPref?.isVisible = false
+                }
+                "manual" -> {
+                    detectedWheelPref?.isVisible = false
+                    modelSelectorPref?.isVisible = false
+                    capacityPref?.isVisible = true
+                    cellCountPref?.isVisible = true
+                }
+            }
+        }
+        
+        private fun updateDetectedWheelInfo(wheelSpec: WheelDatabase.WheelSpec? = null, unknownModel: String? = null) {
+            findPreference<Preference>("detected_wheel_info")?.apply {
+                if (wheelSpec != null) {
+                    title = wheelSpec.displayName
+                    summary = getString(
+                        R.string.settings_detected_wheel_summary,
+                        wheelSpec.manufacturer,
+                        wheelSpec.batteryConfig.capacityWh.toInt(),
+                        wheelSpec.batteryConfig.getConfigString()
+                    )
+                } else if (unknownModel != null) {
+                    title = unknownModel
+                    summary = "Unknown wheel model - please select from database or use manual configuration"
+                } else {
+                    title = getString(R.string.settings_detected_wheel)
+                    summary = getString(R.string.settings_detected_wheel_none)
+                }
+            }
+        }
+        
+        private fun showWheelModelSelector() {
+            val dialog = WheelModelSelectorDialog.newInstance()
+            dialog.setWheelSelectionListener(this)
+            dialog.show(parentFragmentManager, WheelModelSelectorDialog.TAG)
+        }
+        
+        override fun onWheelSelected(wheelSpec: WheelDatabase.WheelSpec) {
+            saveWheelConfig(wheelSpec)
+            
+            // Update selector summary
+            findPreference<Preference>("wheel_model_selector")?.summary = 
+                "${wheelSpec.displayName} - ${wheelSpec.batteryConfig.capacityWh.toInt()} Wh (${wheelSpec.batteryConfig.getConfigString()})"
+            
+            Toast.makeText(
+                requireContext(),
+                "Selected: ${wheelSpec.displayName}",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+        
+        private fun saveWheelConfig(wheelSpec: WheelDatabase.WheelSpec) {
+            preferenceManager.sharedPreferences?.edit()?.apply {
+                putString("selected_wheel_model", wheelSpec.displayName)
+                putInt("battery_capacity_wh", wheelSpec.batteryConfig.capacityWh.toInt())
+                putInt("battery_cell_count", wheelSpec.batteryConfig.cellCount)
+                apply()
             }
         }
         

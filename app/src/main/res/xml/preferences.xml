@@ -117,6 +117,35 @@
             android:defaultValue="false"
             app:iconSpaceReserved="false" />
 
+        <!-- Wheel Configuration Mode -->
+        <ListPreference
+            android:key="wheel_config_mode"
+            android:title="@string/settings_wheel_config_mode"
+            android:summary="@string/settings_wheel_config_mode_summary"
+            android:entries="@array/wheel_config_mode_entries"
+            android:entryValues="@array/wheel_config_mode_values"
+            android:defaultValue="auto"
+            android:dependency="range_estimation_enabled"
+            app:iconSpaceReserved="false" />
+
+        <!-- Auto-detected Wheel (read-only display) -->
+        <Preference
+            android:key="detected_wheel_info"
+            android:title="@string/settings_detected_wheel"
+            android:summary="@string/settings_detected_wheel_none"
+            android:enabled="false"
+            android:dependency="range_estimation_enabled"
+            app:iconSpaceReserved="false" />
+
+        <!-- Wheel Model Selector (shown when mode is "database") -->
+        <Preference
+            android:key="wheel_model_selector"
+            android:title="@string/settings_wheel_model_selector"
+            android:summary="@string/settings_wheel_model_selector_summary"
+            android:dependency="range_estimation_enabled"
+            app:iconSpaceReserved="false" />
+
+        <!-- Manual Configuration (shown when mode is "manual") -->
         <EditTextPreference
             android:key="battery_capacity_wh"
             android:title="@string/settings_battery_capacity"

@@ -29,11 +29,30 @@
         <item>16S (67.2V nominal)</item>
         <item>20S (84V nominal)</item>
         <item>24S (100.8V nominal)</item>
+        <item>30S (126V nominal)</item>
+        <item>36S (151.2V nominal)</item>
+        <item>40S (168V nominal)</item>
     </string-array>
     
     <string-array name="battery_cell_count_values">
         <item>16</item>
         <item>20</item>
         <item>24</item>
+        <item>30</item>
+        <item>36</item>
+        <item>40</item>
+    </string-array>
+    
+    <!-- Wheel Configuration Mode -->
+    <string-array name="wheel_config_mode_entries">
+        <item>Auto-detect from wheel</item>
+        <item>Select from database</item>
+        <item>Manual configuration</item>
+    </string-array>
+    
+    <string-array name="wheel_config_mode_values">
+        <item>auto</item>
+        <item>database</item>
+        <item>manual</item>
     </string-array>
 </resources>

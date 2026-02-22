@@ -89,10 +89,25 @@
     <string name="settings_category_range_estimation">Range Estimation</string>
     <string name="settings_range_estimation_enabled">Enable Range Estimation</string>
     <string name="settings_range_estimation_enabled_summary">Calculate remaining range based on battery usage patterns</string>
+    
+    <!-- Wheel Configuration -->
+    <string name="settings_wheel_config_mode">Wheel Configuration</string>
+    <string name="settings_wheel_config_mode_summary">Choose how battery specs are determined</string>
+    <string name="settings_detected_wheel">Detected Wheel</string>
+    <string name="settings_detected_wheel_summary">%1$s - %2$d Wh, %3$s</string>
+    <string name="settings_detected_wheel_none">No wheel detected yet</string>
+    <string name="settings_wheel_model_selector">Select Wheel Model</string>
+    <string name="settings_wheel_model_selector_summary">Choose your wheel from the database</string>
+    <string name="settings_wheel_manufacturer_filter">Filter by Manufacturer</string>
+    <string name="settings_wheel_manufacturer_filter_summary">Show only wheels from selected manufacturer</string>
+    
+    <!-- Manual Configuration -->
     <string name="settings_battery_capacity">Battery Capacity (Wh)</string>
     <string name="settings_battery_capacity_summary">Total battery capacity in watt-hours (e.g., 2000 for 2kWh)</string>
     <string name="settings_battery_cell_count">Battery Cell Count</string>
-    <string name="settings_battery_cell_count_summary">Number of battery cells in series (e.g., 20S for 84V wheel)</string>
+    <string name="settings_battery_cell_count_summary">Number of battery cells in series (e.g., 20S for 84V, 30S for 126V)</string>
+    
+    <!-- Algorithm Settings -->
     <string name="settings_range_algorithm">Estimation Algorithm</string>
     <string name="settings_range_algorithm_summary">Choose the calculation method</string>
     <string name="settings_range_preset">Estimation Preset</string>
@@ -102,6 +117,15 @@
     <string name="reset_range_trip_title">Reset Range Trip?</string>
     <string name="reset_range_trip_message">This will clear all collected trip data. Range estimation will restart from scratch. Continue?</string>
     <string name="reset_range_trip_success">Range trip data has been reset</string>
+    
+    <!-- Wheel Database -->
+    <string name="all_manufacturers">All Manufacturers</string>
+    <string name="manufacturer_begode">Begode</string>
+    <string name="manufacturer_inmotion">InMotion</string>
+    <string name="manufacturer_kingsong">KingSong</string>
+    <string name="manufacturer_veteran">Veteran</string>
+    <string name="manufacturer_leaperkim">Leaperkim</string>
+    <string name="manufacturer_custom">Custom</string>
     
     <!-- Range Estimation Display -->
     <string name="range_estimate">Range Estimate</string>
