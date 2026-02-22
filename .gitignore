@@ -78,3 +78,11 @@ credentials.json
 secrets.xml
 keystore.passwd
 keystore.properties
+
+# Google Play API service account credentials (sensitive!)
+play-service-account.json
+*service-account*.json
+
+# Auto-generated release notes
+RELEASE_NOTES.txt
+app/src/main/play/release-notes/
