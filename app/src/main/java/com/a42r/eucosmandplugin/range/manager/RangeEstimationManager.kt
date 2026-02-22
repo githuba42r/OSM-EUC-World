@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import com.a42r.eucosmandplugin.api.EucData
 import com.a42r.eucosmandplugin.range.algorithm.*
+import com.a42r.eucosmandplugin.range.database.WheelDatabase
 import com.a42r.eucosmandplugin.range.model.*
 import com.a42r.eucosmandplugin.range.util.SampleValidator
 
@@ -61,8 +62,9 @@ class RangeEstimationManager(
         
         // Settings keys
         private const val PREF_RANGE_ENABLED = "range_estimation_enabled"
+        private const val PREF_WHEEL_CONFIG_MODE = "wheel_config_mode"
         private const val PREF_BATTERY_CAPACITY_WH = "battery_capacity_wh"
-        private const val PREF_CELL_COUNT = "cell_count"
+        private const val PREF_CELL_COUNT = "battery_cell_count"
         private const val PREF_ALGORITHM = "range_algorithm"
         
         // Default values
@@ -86,6 +88,9 @@ class RangeEstimationManager(
     }
     private var chargingState = ChargingState.NOT_CHARGING
     private var chargingSuspectedSample: BatterySample? = null
+    
+    // Auto-detection state
+    private var lastDetectedWheelModel: String? = null
     
     // Estimator instances
     private lateinit var simpleLinearEstimator: SimpleLinearEstimator
@@ -158,8 +163,10 @@ class RangeEstimationManager(
      * Initialize estimators with current settings.
      */
     private fun initializeEstimators() {
-        val batteryCapacity = prefs.getString(PREF_BATTERY_CAPACITY_WH, DEFAULT_BATTERY_CAPACITY.toString())
-            ?.toDoubleOrNull() ?: DEFAULT_BATTERY_CAPACITY
+        // Read battery capacity (stored as int in preferences)
+        val batteryCapacity = prefs.getInt(PREF_BATTERY_CAPACITY_WH, DEFAULT_BATTERY_CAPACITY.toInt()).toDouble()
+        
+        // Read cell count (stored as int in preferences)
         val cellCount = prefs.getInt(PREF_CELL_COUNT, DEFAULT_CELL_COUNT)
         
         simpleLinearEstimator = SimpleLinearEstimator(
@@ -181,19 +188,23 @@ class RangeEstimationManager(
      * Process a single EucData sample from the stream.
      * 
      * Steps:
-     * 1. Create BatterySample from EucData
-     * 2. Detect and handle connection gaps
-     * 3. Apply voltage compensation
-     * 4. Detect and handle charging events
-     * 5. Validate and flag sample
-     * 6. Add to trip state
-     * 7. Run estimation algorithm
-     * 8. Emit RangeEstimate
+     * 1. Auto-detect wheel configuration if in 'auto' mode
+     * 2. Create BatterySample from EucData
+     * 3. Detect and handle connection gaps
+     * 4. Apply voltage compensation
+     * 5. Detect and handle charging events
+     * 6. Validate and flag sample
+     * 7. Add to trip state
+     * 8. Run estimation algorithm
+     * 9. Emit RangeEstimate
      */
     private fun processSample(eucData: EucData) {
         val currentTimestamp = System.currentTimeMillis()
         
-        // Step 1: Detect connection gap
+        // Step 1: Auto-detect wheel configuration if in 'auto' mode
+        autoDetectWheelConfiguration(eucData)
+        
+        // Step 2: Detect connection gap
         if (lastSample != null) {
             val timeDelta = currentTimestamp - lastSample!!.timestamp
             if (timeDelta > CONNECTION_GAP_THRESHOLD_MS) {
@@ -201,10 +212,10 @@ class RangeEstimationManager(
             }
         }
         
-        // Step 2: Create BatterySample from EucData
+        // Step 3: Create BatterySample from EucData
         val rawSample = createSampleFromEucData(eucData, currentTimestamp)
         
-        // Step 3: Apply voltage compensation
+        // Step 4: Apply voltage compensation
         val compensatedVoltage = if (previousCompensatedVoltage == null) {
             // First sample: initialize compensated voltage
             VoltageCompensator.initializeCompensatedVoltage(rawSample.voltage)
@@ -221,23 +232,72 @@ class RangeEstimationManager(
         
         val sample = rawSample.copy(compensatedVoltage = compensatedVoltage)
         
-        // Step 4: Detect and handle charging
+        // Step 5: Detect and handle charging
         handleChargingDetection(sample)
         
-        // Step 5: Validate and flag sample
+        // Step 6: Validate and flag sample
         val validatedSample = validateSample(sample)
         
-        // Step 6: Add to trip state
+        // Step 7: Add to trip state
         addSampleToTrip(validatedSample)
         
-        // Step 7: Run estimation algorithm
+        // Step 8: Run estimation algorithm
         val estimate = runEstimation()
         
-        // Step 8: Emit estimate
+        // Step 9: Emit estimate
         _rangeEstimate.value = estimate
         
         // Update state for next iteration
         lastSample = validatedSample
+    }
+    
+    /**
+     * Auto-detect wheel configuration from EucData when in 'auto' mode.
+     * 
+     * This method:
+     * 1. Checks if wheel_config_mode is 'auto'
+     * 2. Checks if wheel model has changed
+     * 3. Looks up wheel in database
+     * 4. Saves battery capacity and cell count to SharedPreferences
+     * 5. Reinitializes estimators with new configuration
+     */
+    private fun autoDetectWheelConfiguration(eucData: EucData) {
+        val configMode = prefs.getString(PREF_WHEEL_CONFIG_MODE, "auto") ?: "auto"
+        
+        // Only auto-detect if in 'auto' mode
+        if (configMode != "auto") {
+            return
+        }
+        
+        // Check if wheel model is available and has changed
+        val wheelModel = eucData.wheelModel
+        if (wheelModel.isBlank() || wheelModel == lastDetectedWheelModel) {
+            return
+        }
+        
+        // Try to find wheel in database
+        val wheelSpec = WheelDatabase.findWheelSpec(wheelModel)
+        
+        if (wheelSpec != null) {
+            Log.d(TAG, "Auto-detected wheel: ${wheelSpec.displayName} - ${wheelSpec.batteryConfig.capacityWh}Wh, ${wheelSpec.batteryConfig.cellCount}S")
+            
+            // Save configuration to SharedPreferences
+            prefs.edit().apply {
+                putString("selected_wheel_model", wheelSpec.displayName)
+                putInt(PREF_BATTERY_CAPACITY_WH, wheelSpec.batteryConfig.capacityWh.toInt())
+                putInt(PREF_CELL_COUNT, wheelSpec.batteryConfig.cellCount)
+                apply()
+            }
+            
+            // Reinitialize estimators with new configuration
+            initializeEstimators()
+            
+            // Update last detected model
+            lastDetectedWheelModel = wheelModel
+        } else {
+            Log.w(TAG, "Wheel model '$wheelModel' not found in database")
+            lastDetectedWheelModel = wheelModel
+        }
     }
     
     /**

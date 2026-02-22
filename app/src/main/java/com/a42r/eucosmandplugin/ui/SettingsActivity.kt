@@ -221,7 +221,7 @@ class SettingsActivity : AppCompatActivity() {
         private fun showWheelModelSelector() {
             val dialog = WheelModelSelectorDialog.newInstance()
             dialog.setWheelSelectionListener(this)
-            dialog.show(parentFragmentManager, WheelModelSelectorDialog.TAG)
+            dialog.show(childFragmentManager, WheelModelSelectorDialog.TAG)
         }
         
         override fun onWheelSelected(wheelSpec: WheelDatabase.WheelSpec) {
