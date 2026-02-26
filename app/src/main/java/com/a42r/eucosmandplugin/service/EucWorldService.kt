@@ -30,6 +30,7 @@ import com.a42r.eucosmandplugin.api.EucData
 import com.a42r.eucosmandplugin.api.EucWidgetData
 import com.a42r.eucosmandplugin.api.EucWorldApiClient
 import com.a42r.eucosmandplugin.range.manager.RangeEstimationManager
+import com.a42r.eucosmandplugin.testing.MockEucDataService
 import com.a42r.eucosmandplugin.ui.MainActivity
 import com.a42r.eucosmandplugin.util.TripMeterManager
 
@@ -91,6 +92,9 @@ class EucWorldService : LifecycleService() {
     
     private var pollIntervalMs = DEFAULT_POLL_INTERVAL_MS
     
+    // Flag to indicate if service is being redirected to mock mode
+    private var redirectingToMockMode = false
+    
     // OsmAnd AIDL helper for widget integration
     private lateinit var osmAndHelper: OsmAndAidlHelper
     
@@ -120,6 +124,31 @@ class EucWorldService : LifecycleService() {
     
     override fun onCreate() {
         super.onCreate()
+        
+        // Check if mock mode is enabled
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        val mockEnabled = prefs.getBoolean("mock_data_enabled", false)
+        
+        if (mockEnabled) {
+            Log.d(TAG, "Mock data mode enabled - starting MockEucDataService instead")
+            // Set flag to prevent any other operations
+            redirectingToMockMode = true
+            
+            // IMPORTANT: Must call startForeground() before stopping, even when redirecting
+            // Otherwise Android will crash with ForegroundServiceDidNotStartInTimeException
+            createNotificationChannel()
+            startForeground(NOTIFICATION_ID, createNotification())
+            
+            // Start mock service instead
+            MockEucDataService.start(this)
+            
+            // Stop foreground and stop this service
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+            return
+        }
+        
+        // Normal initialization continues...
         createNotificationChannel()
         initializeApiClient()
         
@@ -149,6 +178,12 @@ class EucWorldService : LifecycleService() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
         
+        // If we're redirecting to mock mode, don't do anything
+        if (redirectingToMockMode) {
+            Log.d(TAG, "Ignoring onStartCommand - redirecting to mock mode")
+            return START_NOT_STICKY
+        }
+        
         when (intent?.action) {
             ACTION_START -> {
                 startForeground(NOTIFICATION_ID, createNotification())
@@ -169,9 +204,12 @@ class EucWorldService : LifecycleService() {
     }
     
     override fun onDestroy() {
-        stopPolling()
-        osmAndHelper.disconnect()
-        unregisterReceiver(tripMeterChangeReceiver)
+        // Only clean up if not redirecting to mock mode
+        if (!redirectingToMockMode) {
+            stopPolling()
+            osmAndHelper.disconnect()
+            unregisterReceiver(tripMeterChangeReceiver)
+        }
         super.onDestroy()
     }
     

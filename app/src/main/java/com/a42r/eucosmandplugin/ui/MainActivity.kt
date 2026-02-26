@@ -20,6 +20,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.PreferenceManager
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import com.a42r.eucosmandplugin.R
@@ -28,6 +29,7 @@ import com.a42r.eucosmandplugin.databinding.ActivityMainBinding
 import com.a42r.eucosmandplugin.service.ConnectionState
 import com.a42r.eucosmandplugin.service.EucWorldService
 import com.a42r.eucosmandplugin.service.OsmAndConnectionService
+import com.a42r.eucosmandplugin.testing.MockEucDataService
 import com.a42r.eucosmandplugin.util.TripMeterManager
 
 /**
@@ -41,15 +43,49 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var tripMeterManager: TripMeterManager
     
-    private var eucService: EucWorldService? = null
+    // Service interface - can be either EucWorldService or MockEucDataService
+    private interface EucServiceInterface {
+        val eucDataState: StateFlow<EucData?>
+        val connectionState: StateFlow<ConnectionState>
+        fun getFullRangeEstimate(): com.a42r.eucosmandplugin.range.model.RangeEstimate?
+        fun triggerImmediateBroadcast()
+    }
+    
+    private var eucService: EucServiceInterface? = null
     private var serviceBound = false
     private var currentOdometer: Double = 0.0
     private var selectedTripMeter: TripMeterManager.TripMeter = TripMeterManager.TripMeter.A
     
-    private val serviceConnection = object : ServiceConnection {
+    private val realServiceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             val binder = service as EucWorldService.LocalBinder
-            eucService = binder.getService()
+            val realService = binder.getService()
+            eucService = object : EucServiceInterface {
+                override val eucDataState = realService.eucDataState
+                override val connectionState = realService.connectionState
+                override fun getFullRangeEstimate() = realService.getFullRangeEstimate()
+                override fun triggerImmediateBroadcast() = realService.triggerImmediateBroadcast()
+            }
+            serviceBound = true
+            observeServiceData()
+        }
+        
+        override fun onServiceDisconnected(name: ComponentName?) {
+            eucService = null
+            serviceBound = false
+        }
+    }
+    
+    private val mockServiceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            val binder = service as MockEucDataService.LocalBinder
+            val mockService = binder.getService()
+            eucService = object : EucServiceInterface {
+                override val eucDataState = mockService.eucDataState
+                override val connectionState = mockService.connectionState
+                override fun getFullRangeEstimate() = mockService.getFullRangeEstimate()
+                override fun triggerImmediateBroadcast() = mockService.triggerImmediateBroadcast()
+            }
             serviceBound = true
             observeServiceData()
         }
@@ -257,21 +293,39 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun bindToService() {
-        Intent(this, EucWorldService::class.java).also { intent ->
-            bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        val mockEnabled = prefs.getBoolean("mock_data_enabled", false)
+        
+        if (mockEnabled) {
+            // Bind to mock service
+            Intent(this, MockEucDataService::class.java).also { intent ->
+                bindService(intent, mockServiceConnection, Context.BIND_AUTO_CREATE)
+            }
+        } else {
+            // Bind to real service
+            Intent(this, EucWorldService::class.java).also { intent ->
+                bindService(intent, realServiceConnection, Context.BIND_AUTO_CREATE)
+            }
         }
     }
     
     private fun unbindFromService() {
         if (serviceBound) {
-            unbindService(serviceConnection)
+            val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+            val mockEnabled = prefs.getBoolean("mock_data_enabled", false)
+            
+            if (mockEnabled) {
+                unbindService(mockServiceConnection)
+            } else {
+                unbindService(realServiceConnection)
+            }
             serviceBound = false
         }
     }
     
     private fun observeServiceData() {
         lifecycleScope.launch {
-            eucService?.eucDataState?.collectLatest { data ->
+            eucService?.eucDataState?.collectLatest { data: EucData? ->
                 if (data != null) {
                     updateUI(data)
                 } else {
@@ -281,7 +335,7 @@ class MainActivity : AppCompatActivity() {
         }
         
         lifecycleScope.launch {
-            eucService?.connectionState?.collectLatest { state ->
+            eucService?.connectionState?.collectLatest { state: ConnectionState ->
                 updateConnectionStatus(state)
             }
         }
@@ -401,6 +455,7 @@ class MainActivity : AppCompatActivity() {
                 binding.tvRangeConfidence.text = getString(R.string.range_collecting_data)
             }
             
+            com.a42r.eucosmandplugin.range.model.EstimateStatus.COLLECTING,
             com.a42r.eucosmandplugin.range.model.EstimateStatus.VALID,
             com.a42r.eucosmandplugin.range.model.EstimateStatus.LOW_CONFIDENCE -> {
                 // Show range estimate
@@ -412,20 +467,42 @@ class MainActivity : AppCompatActivity() {
                     
                     binding.tvRangeEstimate.text = String.format("%.1f %s", rangeValue, unit)
                     
-                    // Show confidence level
-                    val confidence = estimate.confidence
-                    val confidenceText = when {
-                        confidence >= 0.8 -> getString(R.string.range_confidence_high)
-                        confidence >= 0.5 -> getString(R.string.range_confidence_medium)
-                        else -> getString(R.string.range_confidence_low)
+                    // Show confidence level with data collection progress for COLLECTING status
+                    val dataQuality = estimate.dataQuality
+                    val confidenceText = when (estimate.status) {
+                        com.a42r.eucosmandplugin.range.model.EstimateStatus.COLLECTING -> {
+                            // Show which requirement is still being collected
+                            if (!dataQuality.meetsMinimumTime) {
+                                val timeProgress = String.format("%.1f/10 min", dataQuality.travelTimeMinutes)
+                                "Collecting: $timeProgress"
+                            } else {
+                                val distanceProgress = String.format("%.1f/10 km", dataQuality.travelDistanceKm)
+                                "Collecting: $distanceProgress"
+                            }
+                        }
+                        else -> {
+                            val confidence = estimate.confidence
+                            when {
+                                confidence >= 0.8 -> getString(R.string.range_confidence_high)
+                                confidence >= 0.5 -> getString(R.string.range_confidence_medium)
+                                else -> getString(R.string.range_confidence_low)
+                            }
+                        }
                     }
                     binding.tvRangeConfidence.text = confidenceText
                     
-                    // Color based on confidence
-                    val color = when {
-                        confidence >= 0.8 -> getColor(R.color.battery_good)
-                        confidence >= 0.5 -> getColor(R.color.battery_warning)
-                        else -> getColor(R.color.text_secondary)
+                    // Color based on status and confidence
+                    val color = when (estimate.status) {
+                        com.a42r.eucosmandplugin.range.model.EstimateStatus.COLLECTING -> 
+                            getColor(R.color.text_secondary)  // Lower confidence while collecting
+                        else -> {
+                            val confidence = estimate.confidence
+                            when {
+                                confidence >= 0.8 -> getColor(R.color.battery_good)
+                                confidence >= 0.5 -> getColor(R.color.battery_warning)
+                                else -> getColor(R.color.text_secondary)
+                            }
+                        }
                     }
                     binding.tvRangeEstimate.setTextColor(color)
                 } else {

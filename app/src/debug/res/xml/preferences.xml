@@ -1,0 +1,289 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory
+        android:title="@string/settings_category_api"
+        app:iconSpaceReserved="false">
+
+        <EditTextPreference
+            android:key="api_host"
+            android:title="@string/settings_api_host"
+            android:summary="@string/settings_api_host_summary"
+            android:defaultValue="http://localhost"
+            app:iconSpaceReserved="false" />
+
+        <EditTextPreference
+            android:key="api_port"
+            android:title="@string/settings_api_port"
+            android:summary="@string/settings_api_port_summary"
+            android:defaultValue="8080"
+            android:inputType="number"
+            app:iconSpaceReserved="false" />
+
+        <com.a42r.eucosmandplugin.ui.SeekBarWithEditTextPreference
+            android:key="poll_interval"
+            android:title="@string/settings_poll_interval"
+            android:summary="@string/settings_poll_interval_summary"
+            android:defaultValue="500"
+            app:min="100"
+            app:max="2000"
+            app:suffix="ms"
+            app:updateInterval="50"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/settings_category_general"
+        app:iconSpaceReserved="false">
+
+        <SwitchPreferenceCompat
+            android:key="auto_start_on_boot"
+            android:title="@string/settings_auto_start"
+            android:summary="@string/settings_auto_start_summary"
+            android:defaultValue="false"
+            app:iconSpaceReserved="false" />
+
+        <SwitchPreferenceCompat
+            android:key="hide_notification"
+            android:title="@string/settings_hide_notification"
+            android:summary="@string/settings_hide_notification_summary"
+            android:defaultValue="false"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/settings_category_display"
+        app:iconSpaceReserved="false">
+
+        <SwitchPreferenceCompat
+            android:key="use_metric"
+            android:title="@string/settings_use_metric"
+            android:summary="@string/settings_use_metric_summary"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+
+        <SwitchPreferenceCompat
+            android:key="show_battery_icon"
+            android:title="@string/settings_show_battery_icon"
+            android:summary="@string/settings_show_battery_icon_summary"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+
+        <EditTextPreference
+            android:key="battery_warning_percent"
+            android:title="@string/settings_battery_warning_percent"
+            android:summary="@string/settings_battery_warning_percent_summary"
+            android:defaultValue="30"
+            android:inputType="number"
+            app:iconSpaceReserved="false" />
+
+        <EditTextPreference
+            android:key="battery_critical_percent"
+            android:title="@string/settings_battery_critical_percent"
+            android:summary="@string/settings_battery_critical_percent_summary"
+            android:defaultValue="20"
+            android:inputType="number"
+            app:iconSpaceReserved="false" />
+
+        <EditTextPreference
+            android:key="battery_warning_voltage"
+            android:title="@string/settings_battery_warning_voltage"
+            android:summary="@string/settings_battery_warning_voltage_summary"
+            android:defaultValue="78.0"
+            android:inputType="numberDecimal"
+            app:iconSpaceReserved="false" />
+
+        <EditTextPreference
+            android:key="battery_critical_voltage"
+            android:title="@string/settings_battery_critical_voltage"
+            android:summary="@string/settings_battery_critical_voltage_summary"
+            android:defaultValue="72.0"
+            android:inputType="numberDecimal"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/settings_category_range_estimation"
+        app:iconSpaceReserved="false">
+
+        <SwitchPreferenceCompat
+            android:key="range_estimation_enabled"
+            android:title="@string/settings_range_estimation_enabled"
+            android:summary="@string/settings_range_estimation_enabled_summary"
+            android:defaultValue="false"
+            app:iconSpaceReserved="false" />
+
+        <!-- Wheel Configuration Mode -->
+        <ListPreference
+            android:key="wheel_config_mode"
+            android:title="@string/settings_wheel_config_mode"
+            android:summary="@string/settings_wheel_config_mode_summary"
+            android:entries="@array/wheel_config_mode_entries"
+            android:entryValues="@array/wheel_config_mode_values"
+            android:defaultValue="auto"
+            android:dependency="range_estimation_enabled"
+            app:iconSpaceReserved="false" />
+
+        <!-- Auto-detected Wheel (read-only display) -->
+        <Preference
+            android:key="detected_wheel_info"
+            android:title="@string/settings_detected_wheel"
+            android:summary="@string/settings_detected_wheel_none"
+            android:enabled="false"
+            android:dependency="range_estimation_enabled"
+            app:iconSpaceReserved="false" />
+
+        <!-- Wheel Model Selector (shown when mode is "database") -->
+        <Preference
+            android:key="wheel_model_selector"
+            android:title="@string/settings_wheel_model_selector"
+            android:summary="@string/settings_wheel_model_selector_summary"
+            android:dependency="range_estimation_enabled"
+            app:iconSpaceReserved="false" />
+
+        <!-- Manual Configuration (shown when mode is "manual") -->
+        <EditTextPreference
+            android:key="battery_capacity_wh"
+            android:title="@string/settings_battery_capacity"
+            android:summary="@string/settings_battery_capacity_summary"
+            android:defaultValue="2000"
+            android:inputType="number"
+            android:dependency="range_estimation_enabled"
+            app:iconSpaceReserved="false" />
+
+        <ListPreference
+            android:key="battery_cell_count"
+            android:title="@string/settings_battery_cell_count"
+            android:summary="@string/settings_battery_cell_count_summary"
+            android:entries="@array/battery_cell_count_entries"
+            android:entryValues="@array/battery_cell_count_values"
+            android:defaultValue="20"
+            android:dependency="range_estimation_enabled"
+            app:iconSpaceReserved="false" />
+
+        <ListPreference
+            android:key="range_estimation_algorithm"
+            android:title="@string/settings_range_algorithm"
+            android:summary="@string/settings_range_algorithm_summary"
+            android:entries="@array/range_estimation_algorithm_entries"
+            android:entryValues="@array/range_estimation_algorithm_values"
+            android:defaultValue="weighted_window"
+            android:dependency="range_estimation_enabled"
+            app:iconSpaceReserved="false" />
+
+        <ListPreference
+            android:key="range_estimation_preset"
+            android:title="@string/settings_range_preset"
+            android:summary="@string/settings_range_preset_summary"
+            android:entries="@array/range_estimation_preset_entries"
+            android:entryValues="@array/range_estimation_preset_values"
+            android:defaultValue="balanced"
+            android:dependency="range_estimation_enabled"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="reset_range_trip"
+            android:title="@string/settings_reset_range_trip"
+            android:summary="@string/settings_reset_range_trip_summary"
+            android:dependency="range_estimation_enabled"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/settings_category_android_auto"
+        app:iconSpaceReserved="false">
+
+        <com.a42r.eucosmandplugin.ui.AndroidAutoIntervalPreference
+            android:key="android_auto_update_interval"
+            android:title="@string/settings_android_auto_update_interval"
+            android:summary="@string/settings_android_auto_update_interval_summary"
+            android:defaultValue="15"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+    
+    <PreferenceCategory
+        android:title="Developer / Testing"
+        app:iconSpaceReserved="false">
+        
+        <SwitchPreferenceCompat
+            android:key="mock_data_enabled"
+            android:title="Enable Mock Data Mode"
+            android:summary="Simulate EUC data for emulator testing (requires GPS location permission)"
+            android:defaultValue="false"
+            app:iconSpaceReserved="false" />
+        
+        <ListPreference
+            android:key="mock_wheel_model"
+            android:title="Mock Wheel Model"
+            android:summary="Select which wheel to simulate"
+            android:defaultValue="Begode Commander"
+            android:dependency="mock_data_enabled"
+            app:iconSpaceReserved="false" />
+        
+        <EditTextPreference
+            android:key="mock_start_battery"
+            android:title="Starting Battery %"
+            android:summary="Initial battery level (20-100%)"
+            android:defaultValue="95"
+            android:inputType="number"
+            android:dependency="mock_data_enabled"
+            app:iconSpaceReserved="false" />
+        
+        <EditTextPreference
+            android:key="mock_rider_weight"
+            android:title="Rider Weight (kg)"
+            android:summary="Affects power consumption (50-150kg)"
+            android:defaultValue="80"
+            android:inputType="number"
+            android:dependency="mock_data_enabled"
+            app:iconSpaceReserved="false" />
+        
+        <EditTextPreference
+            android:key="mock_base_efficiency"
+            android:title="Base Efficiency (Wh/km)"
+            android:summary="Typical: 15-20 Wh/km for most wheels"
+            android:defaultValue="18"
+            android:inputType="numberDecimal"
+            android:dependency="mock_data_enabled"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/settings_category_about"
+        app:iconSpaceReserved="false">
+
+        <Preference
+            android:key="app_version"
+            android:title="@string/settings_version"
+            android:selectable="false"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="build_date"
+            android:title="@string/settings_build_date"
+            android:selectable="false"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="copyright"
+            android:title="@string/settings_copyright"
+            android:summary="@string/settings_copyright_summary"
+            android:selectable="false"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="github_project"
+            android:title="@string/settings_github"
+            android:summary="@string/settings_github_summary"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
@@ -141,6 +142,32 @@ class SettingsActivity : AppCompatActivity() {
             
             // Update detected wheel info
             updateDetectedWheelInfo()
+            
+            // Mock mode configuration
+            setupMockModeSettings()
+        }
+        
+        override fun onRequestPermissionsResult(
+            requestCode: Int,
+            permissions: Array<out String>,
+            grantResults: IntArray
+        ) {
+            super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+            
+            if (requestCode == REQUEST_LOCATION_PERMISSION) {
+                if (grantResults.isNotEmpty() && 
+                    grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    Toast.makeText(requireContext(), 
+                        "Location permission granted. Mock mode ready.", 
+                        Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(requireContext(), 
+                        "Location permission required for mock mode", 
+                        Toast.LENGTH_LONG).show()
+                    // Disable mock mode if permission denied
+                    findPreference<SwitchPreferenceCompat>("mock_data_enabled")?.isChecked = false
+                }
+            }
         }
         
         override fun onResume() {
@@ -314,6 +341,71 @@ class SettingsActivity : AppCompatActivity() {
                 R.string.reset_range_trip_success,
                 Toast.LENGTH_SHORT
             ).show()
+        }
+        
+        private fun setupMockModeSettings() {
+            // Only setup if preferences exist (debug builds only)
+            val mockEnabledPref = findPreference<SwitchPreferenceCompat>("mock_data_enabled")
+            if (mockEnabledPref == null) {
+                // Mock mode not available in this build variant (release)
+                return
+            }
+            
+            // Populate wheel models from database
+            findPreference<ListPreference>("mock_wheel_model")?.apply {
+                val wheels = WheelDatabase.getAllWheelSpecs()
+                entries = wheels.map { it.displayName }.toTypedArray()
+                entryValues = wheels.map { it.displayName }.toTypedArray()
+                summaryProvider = ListPreference.SimpleSummaryProvider.getInstance()
+            }
+            
+            // Warn when enabling mock mode
+            mockEnabledPref.apply {
+                setOnPreferenceChangeListener { _, newValue ->
+                    if (newValue == true) {
+                        showMockModeWarning()
+                        checkLocationPermissions()
+                    }
+                    true
+                }
+            }
+            
+            // Add summary providers for numeric inputs
+            findPreference<EditTextPreference>("mock_start_battery")?.apply {
+                summaryProvider = EditTextPreference.SimpleSummaryProvider.getInstance()
+            }
+            findPreference<EditTextPreference>("mock_rider_weight")?.apply {
+                summaryProvider = EditTextPreference.SimpleSummaryProvider.getInstance()
+            }
+            findPreference<EditTextPreference>("mock_base_efficiency")?.apply {
+                summaryProvider = EditTextPreference.SimpleSummaryProvider.getInstance()
+            }
+        }
+        
+        private fun showMockModeWarning() {
+            AlertDialog.Builder(requireContext())
+                .setTitle("Mock Data Mode")
+                .setMessage("This mode simulates EUC data for testing on emulator. Real EUC connection will be disabled.\n\nRequires:\n• GPS/Location permission\n• GPX file loaded in emulator\n\nRemember to disable this when testing with real hardware.")
+                .setPositiveButton("OK", null)
+                .show()
+        }
+        
+        private fun checkLocationPermissions() {
+            val hasPermission = ContextCompat.checkSelfPermission(
+                requireContext(),
+                android.Manifest.permission.ACCESS_FINE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            
+            if (!hasPermission) {
+                requestPermissions(
+                    arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION),
+                    REQUEST_LOCATION_PERMISSION
+                )
+            }
+        }
+        
+        companion object {
+            private const val REQUEST_LOCATION_PERMISSION = 1001
         }
     }
 }

@@ -85,8 +85,8 @@ class SimpleLinearEstimator(
             meetsMinimumDistance = meetsMinimumDistance
         )
         
-        // Return insufficient data if requirements not met
-        if (!meetsMinimumTime || !meetsMinimumDistance) {
+        // Return insufficient data if neither requirement met
+        if (!meetsMinimumTime && !meetsMinimumDistance) {
             return RangeEstimate(
                 rangeKm = null,
                 confidence = 0.0,
@@ -140,8 +140,9 @@ class SimpleLinearEstimator(
             timeMinutes = travelTimeMinutes
         )
         
-        // Determine status
+        // Determine status based on confidence and data requirements
         val status = when {
+            !meetsMinimumTime || !meetsMinimumDistance -> EstimateStatus.COLLECTING  // One requirement met, generating estimates
             confidence < 0.5 -> EstimateStatus.LOW_CONFIDENCE
             else -> EstimateStatus.VALID
         }

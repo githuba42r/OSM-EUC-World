@@ -9,6 +9,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    
+    <!-- Location permissions for mock mode testing (GPS simulation) -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <!-- Device restrictions: Handhelds only (exclude tablets and Chromebooks) -->
     <uses-feature
@@ -68,6 +72,13 @@
         <!-- EUC World Data Service -->
         <service
             android:name=".service.EucWorldService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+        
+        <!-- Mock EUC Data Service (for emulator testing) -->
+        <service
+            android:name=".testing.MockEucDataService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
