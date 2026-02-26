@@ -73,13 +73,28 @@ data class BatterySample(
     
     /** Whether this sample is valid for efficiency calculations */
     val isValidForEstimation: Boolean
-        get() = flags.isEmpty() && 
-                voltage > 0 && 
-                compensatedVoltage > 0 &&
-                batteryPercent in 0.0..100.0 &&
-                speedKmh >= 0 &&
-                !instantEfficiencyWhPerKm.isNaN() &&
-                !instantEfficiencyWhPerKm.isInfinite()
+        get() {
+            // Define which flags invalidate a sample for estimation
+            // INTERPOLATED samples are acceptable and should be included
+            val invalidatingFlags = setOf(
+                SampleFlag.CHARGING_DETECTED,
+                SampleFlag.VOLTAGE_ANOMALY,
+                SampleFlag.DISTANCE_ANOMALY,
+                SampleFlag.EFFICIENCY_OUTLIER,
+                SampleFlag.SPEED_ANOMALY
+            )
+            
+            // Check if sample has any invalidating flags
+            val hasInvalidatingFlag = flags.any { it in invalidatingFlags }
+            
+            return !hasInvalidatingFlag && 
+                   voltage > 0 && 
+                   compensatedVoltage > 0 &&
+                   batteryPercent in 0.0..100.0 &&
+                   speedKmh >= 0 &&
+                   !instantEfficiencyWhPerKm.isNaN() &&
+                   !instantEfficiencyWhPerKm.isInfinite()
+        }
 }
 
 enum class SampleFlag {

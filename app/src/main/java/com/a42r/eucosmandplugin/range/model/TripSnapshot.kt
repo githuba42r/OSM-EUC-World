@@ -83,12 +83,13 @@ data class TripSnapshot(
     /**
      * Get all riding segments since the current baseline.
      * Used for range estimation calculations.
+     * Includes CONNECTION_GAP segments with interpolated samples.
      */
     fun getSegmentsSinceBaseline(): List<TripSegment> {
         val baseline = currentBaselineSegment ?: return emptyList()
         return segments.filter { 
             it.startTimestamp >= baseline.startTimestamp &&
-            it.type == SegmentType.NORMAL_RIDING
+            (it.type == SegmentType.NORMAL_RIDING || it.type == SegmentType.CONNECTION_GAP)
         }
     }
     
