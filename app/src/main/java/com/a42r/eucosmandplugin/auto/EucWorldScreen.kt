@@ -19,11 +19,11 @@ import com.a42r.eucosmandplugin.util.TripMeterManager
 /**
  * Android Auto screen showing EUC telemetry with detailed layout.
  * 
- * Layout similar to phone app:
+ * Layout:
  * - Device name and connection status at top
- * - Large battery percentage display
- * - Voltage underneath battery
- * - Three trip meters at bottom with reset buttons
+ * - Battery percentage and voltage on same row (% left, voltage right)
+ * - Range estimate (if enabled)
+ * - Three trip meters with reset buttons
  */
 class EucWorldScreen(carContext: CarContext) : Screen(carContext) {
     
@@ -258,23 +258,15 @@ class EucWorldScreen(carContext: CarContext) : Screen(carContext) {
         // Build pane with informational rows
         val paneBuilder = Pane.Builder()
         
-        // Row 1: Large Battery Percentage (most prominent)
+        // Row 1: Battery Percentage and Voltage on same line
         paneBuilder.addRow(
             Row.Builder()
-                .setTitle("Battery")
-                .addText("${data.batteryPercentage}%")
-                .build()
-        )
-        
-        // Row 2: Voltage (under battery)
-        paneBuilder.addRow(
-            Row.Builder()
-                .setTitle("Voltage")
+                .setTitle("${data.batteryPercentage}%")
                 .addText(String.format("%.2f V", data.voltage))
                 .build()
         )
         
-        // Row 3: Range Estimate (if available)
+        // Row 2: Range Estimate (if available)
         val prefs = PreferenceManager.getDefaultSharedPreferences(carContext)
         val rangeEnabled = prefs.getBoolean("range_estimation_enabled", false)
         
@@ -297,7 +289,7 @@ class EucWorldScreen(carContext: CarContext) : Screen(carContext) {
             )
         }
         
-        // Row 4: Trip meters display
+        // Row 3: Trip meters display
         val (tripA, tripB, tripC) = tripMeterManager.getAllTripDistances(currentOdometer)
         val tripLine = "A: ${formatTripDistance(tripA)} km  •  B: ${formatTripDistance(tripB)} km  •  C: ${formatTripDistance(tripC)} km"
         
