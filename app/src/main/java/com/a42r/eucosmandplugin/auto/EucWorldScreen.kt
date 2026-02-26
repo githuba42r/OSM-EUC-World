@@ -38,6 +38,11 @@ class EucWorldScreen(carContext: CarContext) : Screen(carContext) {
         private const val DEFAULT_UPDATE_INTERVAL_SECONDS = 15
         private const val MIN_UPDATE_INTERVAL_SECONDS = 5
         private const val MAX_UPDATE_INTERVAL_SECONDS = 300 // 5 minutes
+        
+        // Thresholds for change detection (prevent excessive invalidation)
+        private const val VOLTAGE_CHANGE_THRESHOLD = 0.5 // Volts
+        private const val TRIP_CHANGE_THRESHOLD = 0.1 // km
+        private const val RANGE_CHANGE_THRESHOLD = 1.0 // km
     }
     
     // Current EUC data
@@ -61,6 +66,7 @@ class EucWorldScreen(carContext: CarContext) : Screen(carContext) {
     private var lastTripA: Double? = null
     private var lastTripB: Double? = null
     private var lastTripC: Double? = null
+    private var lastRangeEstimateKm: Double? = null
     
     /**
      * Get the user-configured update interval from preferences
@@ -112,6 +118,7 @@ class EucWorldScreen(carContext: CarContext) : Screen(carContext) {
                             lastBatteryPercentage = eucData?.batteryPercentage
                             lastVoltage = eucData?.voltage
                             lastConnectionState = connectionState
+                            lastRangeEstimateKm = rangeEstimateKm
                             // Store current trip values
                             val (tripA, tripB, tripC) = tripMeterManager.getAllTripDistances(currentOdometer)
                             lastTripA = tripA
@@ -150,8 +157,9 @@ class EucWorldScreen(carContext: CarContext) : Screen(carContext) {
      * 1. Enough time has passed since last update (throttling)
      * 2. OR connection state changed
      * 3. OR battery percentage changed by 1% or more
-     * 4. OR voltage changed significantly
-     * 5. OR trip meter values changed
+     * 4. OR voltage changed significantly (>= threshold)
+     * 5. OR trip meter values changed significantly (>= threshold)
+     * 6. OR range estimate changed significantly (>= threshold)
      */
     private fun shouldInvalidate(): Boolean {
         val now = System.currentTimeMillis()
@@ -169,18 +177,37 @@ class EucWorldScreen(carContext: CarContext) : Screen(carContext) {
                 return true
             }
             
-            // Allow update if voltage changed by more than 0.5V
+            // Allow update if voltage changed by more than threshold
             if (currentVoltage != null && lastVoltage != null) {
-                if (Math.abs(currentVoltage - lastVoltage!!) > 0.5) {
+                if (Math.abs(currentVoltage - lastVoltage!!) >= VOLTAGE_CHANGE_THRESHOLD) {
                     Log.d(TAG, "Voltage changed significantly: $lastVoltage -> $currentVoltage")
                     return true
                 }
             }
             
-            // Allow update if any trip meter changed
+            // Allow update if any trip meter changed by more than threshold
             val (tripA, tripB, tripC) = tripMeterManager.getAllTripDistances(currentOdometer)
-            if (tripA != lastTripA || tripB != lastTripB || tripC != lastTripC) {
-                Log.d(TAG, "Trip meter changed: A=$lastTripA->$tripA, B=$lastTripB->$tripB, C=$lastTripC->$tripC")
+            val tripAChanged = tripA != null && lastTripA != null && Math.abs(tripA - lastTripA!!) >= TRIP_CHANGE_THRESHOLD
+            val tripBChanged = tripB != null && lastTripB != null && Math.abs(tripB - lastTripB!!) >= TRIP_CHANGE_THRESHOLD
+            val tripCChanged = tripC != null && lastTripC != null && Math.abs(tripC - lastTripC!!) >= TRIP_CHANGE_THRESHOLD
+            val tripNewOrRemoved = (tripA == null) != (lastTripA == null) || 
+                                   (tripB == null) != (lastTripB == null) || 
+                                   (tripC == null) != (lastTripC == null)
+            
+            if (tripAChanged || tripBChanged || tripCChanged || tripNewOrRemoved) {
+                Log.d(TAG, "Trip meter changed significantly: A=$lastTripA->$tripA, B=$lastTripB->$tripB, C=$lastTripC->$tripC")
+                return true
+            }
+            
+            // Allow update if range estimate changed by more than threshold
+            if (rangeEstimateKm != null && lastRangeEstimateKm != null) {
+                if (Math.abs(rangeEstimateKm!! - lastRangeEstimateKm!!) >= RANGE_CHANGE_THRESHOLD) {
+                    Log.d(TAG, "Range estimate changed significantly: $lastRangeEstimateKm -> $rangeEstimateKm")
+                    return true
+                }
+            } else if ((rangeEstimateKm == null) != (lastRangeEstimateKm == null)) {
+                // Range estimate appeared or disappeared
+                Log.d(TAG, "Range estimate availability changed: $lastRangeEstimateKm -> $rangeEstimateKm")
                 return true
             }
             
