@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit
  * 
  * API Details:
  * - Endpoint: http://127.0.0.1:8080/api/values
- * - Response: {"values": [{"v": value, "w": "key", "l": bool, ...}, ...]}
+ * - Response: {"values": [{"v": value, "w": "key", "d": bool, "a": timestamp, ...}, ...]}
  * 
  * Key field codes (w):
  * - "vba" -> Battery % (v field)
@@ -33,6 +33,11 @@ import java.util.concurrent.TimeUnit
  * - "vcu" -> Current (v field)
  * - "vdv" -> Wheel trip distance (v field)
  * - "vdt" -> Total distance/odometer (v field)
+ * - "vmmo" -> Wheel model name (s field)
+ * 
+ * Connection Detection:
+ * - "d" field (data validity): true = wheel connected, false = disconnected
+ * - "a" field (age): UNIX timestamp in ms of last update
  */
 class EucWorldApiClient(
     private val baseUrl: String = DEFAULT_BASE_URL,
@@ -196,23 +201,51 @@ class EucWorldApiClient(
         val totalDistance = getDouble(KEY_TOTAL_DISTANCE)
         val wheelModel = getString(KEY_MODEL)
         
-        // The "a" field in EUC World API contains a timestamp
-        // When CONNECTED: a = small number (milliseconds since connection, e.g., 6, 825, 967)
-        // When DISCONNECTED: a = large Unix timestamp (e.g., 1771476453040)
+        // Connection detection using the 'd' (data validity) field
+        // The 'd' field indicates if the value is current/valid (wheel connected)
+        // true = value is current, wheel is connected
+        // false = value is stale, wheel is disconnected
         // 
-        // A Unix timestamp for 2026 is ~1735689600000 (Jan 1, 2026)
-        // If 'a' is less than 1 billion, it's a relative timestamp (connected)
-        // If 'a' is greater than 1 billion, it's an absolute Unix timestamp (disconnected)
-        val batteryTimestamp = valueMap[KEY_BATTERY_PERCENT]?.a ?: 
-                              valueMap[KEY_BATTERY_FULL]?.a ?: 
-                              Long.MAX_VALUE
+        // Check multiple key telemetry values to determine overall connection state
+        val batteryValid = valueMap[KEY_BATTERY_PERCENT]?.d ?: valueMap[KEY_BATTERY_FULL]?.d ?: false
+        val voltageValid = valueMap[KEY_VOLTAGE]?.d ?: false
+        val speedValid = valueMap[KEY_SPEED]?.d ?: false
         
-        // Consider connected if we have battery data AND timestamp is relative (< 1 billion)
-        val hasBatteryData = batteryPercent > 0 || voltage > 0
-        val hasRecentConnection = batteryTimestamp < 1_000_000_000L
-        val isConnected = hasBatteryData && hasRecentConnection
+        // Consider connected if any primary telemetry value is valid
+        // Battery or voltage validity is sufficient to indicate connection
+        val isConnected = batteryValid || voltageValid || speedValid
         
-        Log.d(TAG, "Parsed: battery=$batteryPercent%, voltage=${voltage}V, speed=$speed, model=$wheelModel, connected=$isConnected")
+        // Additional check: if we have battery data but all 'd' flags are null (older API),
+        // fall back to the timestamp-based detection
+        if (!isConnected && (batteryPercent > 0 || voltage > 0)) {
+            val batteryTimestamp = valueMap[KEY_BATTERY_PERCENT]?.a ?: 
+                                  valueMap[KEY_BATTERY_FULL]?.a ?: 
+                                  Long.MAX_VALUE
+            
+            // Legacy detection: relative timestamp (< 1 billion) means connected
+            val hasRecentConnection = batteryTimestamp < 1_000_000_000L
+            val isConnectedLegacy = hasRecentConnection
+            
+            if (isConnectedLegacy) {
+                Log.d(TAG, "Using legacy timestamp-based connection detection")
+            }
+            
+            return EucData(
+                batteryPercentage = batteryPercent,
+                voltage = voltage,
+                speed = speed,
+                temperature = temperature,
+                power = power,
+                current = current,
+                wheelTrip = wheelTrip,
+                totalDistance = totalDistance,
+                wheelModel = wheelModel,
+                isConnected = isConnectedLegacy,
+                timestamp = System.currentTimeMillis()
+            )
+        }
+        
+        Log.d(TAG, "Parsed: battery=$batteryPercent%, voltage=${voltage}V, speed=$speed, model=$wheelModel, connected=$isConnected (batteryValid=$batteryValid, voltageValid=$voltageValid)")
         
         return EucData(
             batteryPercentage = batteryPercent,
@@ -287,20 +320,24 @@ data class EucWorldApiResponse(
 /**
  * Represents a single value item from the EUC World API response.
  * 
- * Example JSON: {"v": 100.0, "w": "vba", "l": false, "t": 5, "a": 20}
+ * Example JSON: {"v": 100.0, "w": "vba", "d": true, "l": false, "t": 5, "a": 20}
  * 
  * @param v Numeric value
  * @param w Key/code identifying the value type (e.g., "vba" for battery %)
+ * @param d Data validity - true if value is current (wheel connected), false if stale (disconnected)
  * @param l Lock flag (unclear purpose)
  * @param t Type indicator
- * @param a Additional info
+ * @param a Age - UNIX timestamp in ms of last update
  * @param s String value (for model name, firmware, etc.)
+ * @param n Numeric value as string (alternative to v)
  */
 data class EucValueItem(
     val v: Double? = null,
     val w: String? = null,
+    val d: Boolean? = null,
     val l: Boolean? = null,
     val t: Int? = null,
     val a: Long? = null,
-    val s: String? = null
+    val s: String? = null,
+    val n: String? = null
 )

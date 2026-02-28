@@ -13,6 +13,7 @@ import com.a42r.eucosmandplugin.range.algorithm.*
 import com.a42r.eucosmandplugin.range.database.WheelDatabase
 import com.a42r.eucosmandplugin.range.model.*
 import com.a42r.eucosmandplugin.range.util.SampleValidator
+import com.google.gson.Gson
 
 /**
  * Core orchestrator for range estimation feature.
@@ -72,6 +73,18 @@ class RangeEstimationManager(
         private const val PREF_CELL_COUNT = "battery_cell_count"
         private const val PREF_ALGORITHM = "range_algorithm"
         
+        // Trip state persistence keys
+        private const val PREF_LAST_SAMPLE_TIMESTAMP = "range_last_sample_timestamp"
+        private const val PREF_LAST_SAMPLE_VOLTAGE = "range_last_sample_voltage"
+        private const val PREF_LAST_SAMPLE_COMPENSATED_VOLTAGE = "range_last_sample_compensated_voltage"
+        private const val PREF_LAST_SAMPLE_BATTERY_PERCENT = "range_last_sample_battery_percent"
+        private const val PREF_LAST_SAMPLE_DISTANCE = "range_last_sample_distance"
+        private const val PREF_LAST_SAMPLE_SPEED = "range_last_sample_speed"
+        private const val PREF_LAST_SAMPLE_POWER = "range_last_sample_power"
+        private const val PREF_LAST_SAMPLE_CURRENT = "range_last_sample_current"
+        private const val PREF_LAST_CONNECTION_STATE = "range_last_connection_state"
+        private const val PREF_DISCONNECTION_START = "range_disconnection_start"
+        
         // Default values
         private const val DEFAULT_BATTERY_CAPACITY = 2000.0 // Wh
         private const val DEFAULT_CELL_COUNT = 20 // 20S pack (84V nominal)
@@ -88,6 +101,11 @@ class RangeEstimationManager(
     // Estimation update throttling
     private var lastEstimationTimestamp: Long = 0L
     
+    // Connection state tracking for gap detection
+    private var lastConnectionState: Boolean = false
+    private var lastDataTimestamp: Long = 0L
+    private var disconnectionStartTimestamp: Long? = null
+    
     // Charging detection state machine
     private enum class ChargingState {
         NOT_CHARGING,
@@ -99,6 +117,11 @@ class RangeEstimationManager(
     
     // Auto-detection state
     private var lastDetectedWheelModel: String? = null
+    
+    // Historical calibration
+    private lateinit var historicalDataManager: HistoricalDataManager
+    private val milestones = mutableListOf<BatteryMilestone>()
+    private var lastMilestonePercent: Int = 100
     
     // Estimator instances
     private lateinit var simpleLinearEstimator: SimpleLinearEstimator
@@ -119,8 +142,14 @@ class RangeEstimationManager(
     fun start(eucDataFlow: StateFlow<EucData?>) {
         Log.d(TAG, "Starting RangeEstimationManager")
         
+        // Initialize historical data manager
+        historicalDataManager = HistoricalDataManager(context)
+        
         // Initialize estimators with current settings
         initializeEstimators()
+        
+        // Restore last known state from persistence (for service restarts)
+        restoreLastKnownState()
         
         // Stop any existing collection
         stop()
@@ -158,7 +187,27 @@ class RangeEstimationManager(
         lastEstimationTimestamp = 0L
         chargingState = ChargingState.NOT_CHARGING
         chargingSuspectedSample = null
+        lastConnectionState = false
+        lastDataTimestamp = 0L
+        disconnectionStartTimestamp = null
+        milestones.clear()
+        lastMilestonePercent = 100
         _rangeEstimate.value = null
+        
+        // Clear persisted state
+        prefs.edit().apply {
+            remove(PREF_LAST_SAMPLE_TIMESTAMP)
+            remove(PREF_LAST_SAMPLE_VOLTAGE)
+            remove(PREF_LAST_SAMPLE_COMPENSATED_VOLTAGE)
+            remove(PREF_LAST_SAMPLE_BATTERY_PERCENT)
+            remove(PREF_LAST_SAMPLE_DISTANCE)
+            remove(PREF_LAST_SAMPLE_SPEED)
+            remove(PREF_LAST_SAMPLE_POWER)
+            remove(PREF_LAST_SAMPLE_CURRENT)
+            remove(PREF_LAST_CONNECTION_STATE)
+            remove(PREF_DISCONNECTION_START)
+            apply()
+        }
     }
     
     /**
@@ -190,14 +239,16 @@ class RangeEstimationManager(
         
         simpleLinearEstimator = SimpleLinearEstimator(
             batteryCapacityWh = batteryCapacity,
-            cellCount = cellCount
+            cellCount = cellCount,
+            historicalDataManager = historicalDataManager
         )
         
         weightedWindowEstimator = WeightedWindowEstimator(
             batteryCapacityWh = batteryCapacity,
             cellCount = cellCount,
             windowMinutes = 30,  // Balanced preset
-            weightDecayFactor = 0.5
+            weightDecayFactor = 0.5,
+            historicalDataManager = historicalDataManager
         )
         
         Log.d(TAG, "Estimators initialized: battery=${batteryCapacity}Wh, cells=${cellCount}S")
@@ -208,14 +259,15 @@ class RangeEstimationManager(
      * 
      * Steps:
      * 1. Auto-detect wheel configuration if in 'auto' mode
-     * 2. Create BatterySample from EucData
-     * 3. Detect and handle connection gaps
-     * 4. Apply voltage compensation
-     * 5. Detect and handle charging events
-     * 6. Validate and flag sample
-     * 7. Add to trip state
-     * 8. Run estimation algorithm (throttled based on battery level)
-     * 9. Emit RangeEstimate
+     * 2. Detect wheel disconnection state
+     * 3. Create BatterySample from EucData
+     * 4. Detect and handle connection gaps
+     * 5. Apply voltage compensation
+     * 6. Detect and handle charging events
+     * 7. Validate and flag sample
+     * 8. Add to trip state
+     * 9. Run estimation algorithm (throttled based on battery level)
+     * 10. Emit RangeEstimate
      */
     private fun processSample(eucData: EucData) {
         val currentTimestamp = System.currentTimeMillis()
@@ -223,18 +275,56 @@ class RangeEstimationManager(
         // Step 1: Auto-detect wheel configuration if in 'auto' mode
         autoDetectWheelConfiguration(eucData)
         
-        // Step 2: Detect connection gap
+        // Step 2: Check if wheel is disconnected (EUC.World active but wheel not connected)
+        // In this case, we should not process samples but also not lose existing trip state
+        if (!eucData.isConnected) {
+            Log.d(TAG, "Wheel disconnected - pausing sample collection")
+            
+            // Track disconnection start time for interpolation when reconnected
+            if (lastConnectionState) {
+                // Just became disconnected
+                disconnectionStartTimestamp = lastSample?.timestamp ?: currentTimestamp
+                Log.d(TAG, "Wheel disconnection started at $disconnectionStartTimestamp")
+            }
+            
+            lastConnectionState = false
+            lastDataTimestamp = currentTimestamp
+            
+            // Emit current estimate with stale warning if disconnected for too long
+            if (disconnectionStartTimestamp != null && 
+                currentTimestamp - disconnectionStartTimestamp!! > 60000L) { // 1 minute
+                val currentEstimate = _rangeEstimate.value
+                if (currentEstimate != null && currentEstimate.status != EstimateStatus.STALE) {
+                    _rangeEstimate.value = currentEstimate.copy(status = EstimateStatus.STALE)
+                }
+            }
+            return
+        }
+        
+        // Step 3: Wheel just reconnected - handle reconnection gap
+        if (!lastConnectionState && lastSample != null && disconnectionStartTimestamp != null) {
+            val gapDuration = currentTimestamp - disconnectionStartTimestamp!!
+            Log.d(TAG, "Wheel reconnected after ${gapDuration}ms disconnection")
+            handleConnectionGap(lastSample!!, eucData, gapDuration)
+            disconnectionStartTimestamp = null
+        }
+        
+        lastConnectionState = true
+        lastDataTimestamp = currentTimestamp
+        
+        // Step 4: Detect connection gap (time-based, even when connected)
         if (lastSample != null) {
             val timeDelta = currentTimestamp - lastSample!!.timestamp
             if (timeDelta > CONNECTION_GAP_THRESHOLD_MS) {
+                Log.d(TAG, "Time gap detected: ${timeDelta}ms between samples")
                 handleConnectionGap(lastSample!!, eucData, timeDelta)
             }
         }
         
-        // Step 3: Create BatterySample from EucData
+        // Step 5: Create BatterySample from EucData
         val rawSample = createSampleFromEucData(eucData, currentTimestamp)
         
-        // Step 4: Apply voltage compensation
+        // Step 6: Apply voltage compensation
         val compensatedVoltage = if (previousCompensatedVoltage == null) {
             // First sample: initialize compensated voltage
             VoltageCompensator.initializeCompensatedVoltage(rawSample.voltage)
@@ -251,16 +341,19 @@ class RangeEstimationManager(
         
         val sample = rawSample.copy(compensatedVoltage = compensatedVoltage)
         
-        // Step 5: Detect and handle charging
+        // Step 7: Detect and handle charging
         handleChargingDetection(sample)
         
-        // Step 6: Validate and flag sample
+        // Step 8: Validate and flag sample
         val validatedSample = validateSample(sample)
         
-        // Step 7: Add to trip state
+        // Step 9: Add to trip state
         addSampleToTrip(validatedSample)
         
-        // Step 8: Determine if we should run estimation based on battery level and time since last estimation
+        // Step 9.5: Track battery milestones for historical calibration
+        trackBatteryMilestone(validatedSample)
+        
+        // Step 10: Determine if we should run estimation based on battery level and time since last estimation
         val shouldRunEstimation = shouldRunEstimation(currentTimestamp, sample.batteryPercent)
         
         if (shouldRunEstimation) {
@@ -276,6 +369,9 @@ class RangeEstimationManager(
         
         // Update state for next iteration
         lastSample = validatedSample
+        
+        // Save state for recovery after service restart
+        saveLastKnownState()
     }
     
     /**
@@ -640,5 +736,189 @@ class RangeEstimationManager(
         } catch (e: ClassCastException) {
             prefs.getString(PREF_CELL_COUNT, null)?.toIntOrNull()
         } ?: DEFAULT_CELL_COUNT
+    }
+    
+    /**
+     * Track battery milestones for historical calibration.
+     * 
+     * Records when battery crosses standard percentage thresholds (95%, 90%, 85%, ...)
+     * with distance and efficiency data.
+     */
+    private fun trackBatteryMilestone(sample: BatterySample) {
+        val currentPercent = sample.batteryPercent
+        
+        // Check if we crossed a milestone
+        val milestoneCrossed = BatteryMilestone.getMilestoneCrossed(
+            previousPercent = lastMilestonePercent.toDouble(),
+            currentPercent = currentPercent
+        )
+        
+        if (milestoneCrossed != null) {
+            // Calculate stats for this milestone
+            val baseline = tripSnapshot.currentBaselineSegment?.samples?.firstOrNull()
+            if (baseline != null && sample.tripDistanceKm > baseline.tripDistanceKm) {
+                val distanceFromStart = sample.tripDistanceKm - baseline.tripDistanceKm
+                val timeFromStart = sample.timestamp - baseline.timestamp
+                
+                // Calculate average efficiency so far
+                val energyConsumed = LiIonDischargeCurve.calculateEnergyConsumed(
+                    baseline.compensatedVoltage,
+                    sample.compensatedVoltage,
+                    getCellCount()
+                )
+                
+                val batteryCapacity = try {
+                    prefs.getInt(PREF_BATTERY_CAPACITY_WH, -1).takeIf { it != -1 }?.toDouble()
+                } catch (e: ClassCastException) {
+                    prefs.getString(PREF_BATTERY_CAPACITY_WH, null)?.toDoubleOrNull()
+                } ?: DEFAULT_BATTERY_CAPACITY
+                
+                val energyConsumedWh = (energyConsumed / 100.0) * batteryCapacity
+                val avgEfficiency = if (distanceFromStart > 0) {
+                    energyConsumedWh / distanceFromStart
+                } else {
+                    Double.NaN
+                }
+                
+                if (!avgEfficiency.isNaN() && avgEfficiency > 0) {
+                    val milestone = BatteryMilestone(
+                        batteryPercent = milestoneCrossed,
+                        voltage = sample.compensatedVoltage,
+                        distanceKm = distanceFromStart,
+                        timeMs = timeFromStart,
+                        timestamp = sample.timestamp,
+                        averageEfficiencyWhPerKm = avgEfficiency
+                    )
+                    
+                    milestones.add(milestone)
+                    lastMilestonePercent = milestoneCrossed
+                    
+                    Log.d(TAG, "Milestone: $milestoneCrossed% reached, distance=$distanceFromStart km, efficiency=$avgEfficiency Wh/km")
+                    
+                    // If we have a previous milestone, create a historical segment
+                    if (milestones.size >= 2) {
+                        val previousMilestone = milestones[milestones.size - 2]
+                        createHistoricalSegment(previousMilestone, milestone, batteryCapacity)
+                    }
+                }
+            }
+        } else {
+            // Update last milestone percent even if no crossing (for first sample)
+            lastMilestonePercent = currentPercent.toInt()
+        }
+    }
+    
+    /**
+     * Create and save a historical segment from two milestones.
+     */
+    private fun createHistoricalSegment(
+        startMilestone: BatteryMilestone,
+        endMilestone: BatteryMilestone,
+        batteryCapacity: Double
+    ) {
+        val distanceKm = endMilestone.distanceKm - startMilestone.distanceKm
+        val durationMs = endMilestone.timeMs - startMilestone.timeMs
+        
+        val energyConsumed = LiIonDischargeCurve.calculateEnergyConsumed(
+            startMilestone.voltage,
+            endMilestone.voltage,
+            getCellCount()
+        )
+        
+        val energyConsumedWh = (energyConsumed / 100.0) * batteryCapacity
+        val efficiency = if (distanceKm > 0) {
+            energyConsumedWh / distanceKm
+        } else {
+            return
+        }
+        
+        val segment = HistoricalSegment(
+            startPercent = startMilestone.batteryPercent,
+            endPercent = endMilestone.batteryPercent,
+            startVoltage = startMilestone.voltage,
+            endVoltage = endMilestone.voltage,
+            distanceKm = distanceKm,
+            durationMs = durationMs,
+            efficiencyWhPerKm = efficiency,
+            timestamp = endMilestone.timestamp,
+            wheelModel = lastDetectedWheelModel ?: "Unknown",
+            batteryCapacityWh = batteryCapacity
+        )
+        
+        historicalDataManager.addSegment(segment)
+    }
+    
+    /**
+     * Save critical trip state to SharedPreferences to survive service restarts.
+     * Called after each sample is processed.
+     */
+    private fun saveLastKnownState() {
+        val last = lastSample ?: return
+        
+        prefs.edit().apply {
+            putLong(PREF_LAST_SAMPLE_TIMESTAMP, last.timestamp)
+            putFloat(PREF_LAST_SAMPLE_VOLTAGE, last.voltage.toFloat())
+            putFloat(PREF_LAST_SAMPLE_COMPENSATED_VOLTAGE, last.compensatedVoltage.toFloat())
+            putFloat(PREF_LAST_SAMPLE_BATTERY_PERCENT, last.batteryPercent.toFloat())
+            putFloat(PREF_LAST_SAMPLE_DISTANCE, last.tripDistanceKm.toFloat())
+            putFloat(PREF_LAST_SAMPLE_SPEED, last.speedKmh.toFloat())
+            putFloat(PREF_LAST_SAMPLE_POWER, last.powerWatts.toFloat())
+            putFloat(PREF_LAST_SAMPLE_CURRENT, last.currentAmps.toFloat())
+            putBoolean(PREF_LAST_CONNECTION_STATE, lastConnectionState)
+            disconnectionStartTimestamp?.let { 
+                putLong(PREF_DISCONNECTION_START, it)
+            } ?: remove(PREF_DISCONNECTION_START)
+            apply()
+        }
+        
+        Log.v(TAG, "Saved last known state: timestamp=${last.timestamp}, voltage=${last.voltage}V, distance=${last.tripDistanceKm}km")
+    }
+    
+    /**
+     * Restore critical trip state from SharedPreferences after service restart.
+     * Only restores if the last sample was recent (< 5 minutes).
+     */
+    private fun restoreLastKnownState() {
+        val lastTimestamp = prefs.getLong(PREF_LAST_SAMPLE_TIMESTAMP, 0L)
+        
+        // Only restore if we have a recent sample (< 5 minutes old)
+        val currentTime = System.currentTimeMillis()
+        val timeSinceLastSample = currentTime - lastTimestamp
+        
+        if (lastTimestamp == 0L || timeSinceLastSample > 5 * 60 * 1000L) {
+            Log.d(TAG, "No recent state to restore (age=${timeSinceLastSample}ms)")
+            return
+        }
+        
+        try {
+            // Restore last sample
+            lastSample = BatterySample(
+                timestamp = lastTimestamp,
+                voltage = prefs.getFloat(PREF_LAST_SAMPLE_VOLTAGE, 0f).toDouble(),
+                compensatedVoltage = prefs.getFloat(PREF_LAST_SAMPLE_COMPENSATED_VOLTAGE, 0f).toDouble(),
+                batteryPercent = prefs.getFloat(PREF_LAST_SAMPLE_BATTERY_PERCENT, 0f).toDouble(),
+                tripDistanceKm = prefs.getFloat(PREF_LAST_SAMPLE_DISTANCE, 0f).toDouble(),
+                speedKmh = prefs.getFloat(PREF_LAST_SAMPLE_SPEED, 0f).toDouble(),
+                powerWatts = prefs.getFloat(PREF_LAST_SAMPLE_POWER, 0f).toDouble(),
+                currentAmps = prefs.getFloat(PREF_LAST_SAMPLE_CURRENT, 0f).toDouble()
+            )
+            
+            previousCompensatedVoltage = lastSample?.compensatedVoltage
+            lastConnectionState = prefs.getBoolean(PREF_LAST_CONNECTION_STATE, false)
+            
+            val disconnectStart = prefs.getLong(PREF_DISCONNECTION_START, -1L)
+            if (disconnectStart > 0L) {
+                disconnectionStartTimestamp = disconnectStart
+            }
+            
+            lastDataTimestamp = currentTime
+            
+            Log.d(TAG, "Restored last known state: timestamp=$lastTimestamp (${timeSinceLastSample}ms ago), voltage=${lastSample?.voltage}V, connected=$lastConnectionState")
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to restore state: ${e.message}")
+            lastSample = null
+            previousCompensatedVoltage = null
+        }
     }
 }

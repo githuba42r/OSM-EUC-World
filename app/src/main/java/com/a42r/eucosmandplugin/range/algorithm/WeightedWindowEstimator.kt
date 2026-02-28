@@ -1,6 +1,7 @@
 package com.a42r.eucosmandplugin.range.algorithm
 
 import com.a42r.eucosmandplugin.range.model.*
+import com.a42r.eucosmandplugin.range.manager.HistoricalDataManager
 import kotlin.math.*
 
 /**
@@ -48,7 +49,10 @@ class WeightedWindowEstimator(
      * Higher = more weight on recent samples
      * 0.3 = Conservative, 0.5 = Balanced, 0.7 = Responsive
      */
-    private val weightDecayFactor: Double = 0.5
+    private val weightDecayFactor: Double = 0.5,
+    
+    /** Historical data manager for calibration (optional) */
+    private val historicalDataManager: HistoricalDataManager? = null
 ) : RangeEstimator {
     
     companion object {
@@ -167,8 +171,20 @@ class WeightedWindowEstimator(
         
         val remainingEnergyWh = currentEnergy * batteryCapacityWh / 100.0
         
-        // Calculate estimated range
-        val estimatedRangeKm = remainingEnergyWh / weightedEfficiency
+        // Calculate base estimated range
+        val baseEstimatedRangeKm = remainingEnergyWh / weightedEfficiency
+        
+        // Apply historical calibration if available
+        val estimatedRangeKm = if (historicalDataManager != null) {
+            val calibrationFactor = historicalDataManager.getCalibrationFactor(
+                currentPercent = currentSample.batteryPercent.toInt(),
+                predictedEfficiency = weightedEfficiency,
+                wheelModel = null // Could pass wheel model from trip metadata
+            )
+            baseEstimatedRangeKm * calibrationFactor
+        } else {
+            baseEstimatedRangeKm
+        }
         
         // Calculate confidence
         val confidence = calculateConfidence(
