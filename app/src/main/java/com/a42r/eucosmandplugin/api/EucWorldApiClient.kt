@@ -37,7 +37,7 @@ import java.util.concurrent.TimeUnit
  * 
  * Connection Detection:
  * - "d" field (data validity): true = wheel connected, false = disconnected
- * - "a" field (age): UNIX timestamp in ms of last update
+ * - "a" field (age): When connected = age in ms (< 30000), when disconnected = Unix epoch timestamp
  */
 class EucWorldApiClient(
     private val baseUrl: String = DEFAULT_BASE_URL,
@@ -222,12 +222,15 @@ class EucWorldApiClient(
                                   valueMap[KEY_BATTERY_FULL]?.a ?: 
                                   Long.MAX_VALUE
             
-            // Legacy detection: relative timestamp (< 1 billion) means connected
-            val hasRecentConnection = batteryTimestamp < 1_000_000_000L
-            val isConnectedLegacy = hasRecentConnection
+            // The 'a' attribute represents the age in milliseconds when connected (< 30000ms),
+            // but switches to Unix epoch time when disconnected (very large value).
+            // If 'a' > 30000ms, the wheel is almost certainly disconnected from EUC World.
+            val isConnectedLegacy = batteryTimestamp < 30_000L
             
             if (isConnectedLegacy) {
-                Log.d(TAG, "Using legacy timestamp-based connection detection")
+                Log.d(TAG, "Using legacy timestamp-based connection detection (a=$batteryTimestamp ms)")
+            } else {
+                Log.d(TAG, "Wheel disconnected - timestamp age exceeds threshold (a=$batteryTimestamp ms)")
             }
             
             return EucData(
@@ -327,7 +330,8 @@ data class EucWorldApiResponse(
  * @param d Data validity - true if value is current (wheel connected), false if stale (disconnected)
  * @param l Lock flag (unclear purpose)
  * @param t Type indicator
- * @param a Age - UNIX timestamp in ms of last update
+ * @param a Age - When wheel is connected, this is age in milliseconds (< 30000ms typical).
+ *          When disconnected, this becomes Unix epoch timestamp (very large value)
  * @param s String value (for model name, firmware, etc.)
  * @param n Numeric value as string (alternative to v)
  */
