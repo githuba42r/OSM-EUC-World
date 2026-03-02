@@ -69,6 +69,48 @@
             android:label="@string/settings"
             android:parentActivityName=".ui.MainActivity" />
 
+        <!-- API Settings Activity -->
+        <activity
+            android:name=".ui.ApiSettingsActivity"
+            android:exported="false"
+            android:label="@string/settings_category_api"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <!-- General Settings Activity -->
+        <activity
+            android:name=".ui.GeneralSettingsActivity"
+            android:exported="false"
+            android:label="@string/settings_category_general"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <!-- Display Settings Activity -->
+        <activity
+            android:name=".ui.DisplaySettingsActivity"
+            android:exported="false"
+            android:label="@string/settings_category_display"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <!-- Range Settings Activity -->
+        <activity
+            android:name=".ui.RangeSettingsActivity"
+            android:exported="false"
+            android:label="@string/settings_category_range_estimation"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <!-- Android Auto Settings Activity -->
+        <activity
+            android:name=".ui.AndroidAutoSettingsActivity"
+            android:exported="false"
+            android:label="@string/settings_category_android_auto"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <!-- About Activity -->
+        <activity
+            android:name=".ui.AboutActivity"
+            android:exported="false"
+            android:label="@string/settings_category_about"
+            android:parentActivityName=".ui.MainActivity" />
+
         <!-- EUC World Data Service -->
         <service
             android:name=".service.EucWorldService"

@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <SwitchPreferenceCompat
+        android:key="range_estimation_enabled"
+        android:title="@string/settings_range_estimation_enabled"
+        android:summary="@string/settings_range_estimation_enabled_summary"
+        android:defaultValue="false"
+        app:iconSpaceReserved="false" />
+
+    <!-- Wheel Configuration Mode -->
+    <ListPreference
+        android:key="wheel_config_mode"
+        android:title="@string/settings_wheel_config_mode"
+        android:summary="@string/settings_wheel_config_mode_summary"
+        android:entries="@array/wheel_config_mode_entries"
+        android:entryValues="@array/wheel_config_mode_values"
+        android:defaultValue="auto"
+        android:dependency="range_estimation_enabled"
+        app:iconSpaceReserved="false" />
+
+    <!-- Auto-detected Wheel (read-only display) -->
+    <Preference
+        android:key="detected_wheel_info"
+        android:title="@string/settings_detected_wheel"
+        android:summary="@string/settings_detected_wheel_none"
+        android:enabled="false"
+        android:dependency="range_estimation_enabled"
+        app:iconSpaceReserved="false" />
+
+    <!-- Wheel Model Selector (shown when mode is "database") -->
+    <Preference
+        android:key="wheel_model_selector"
+        android:title="@string/settings_wheel_model_selector"
+        android:summary="@string/settings_wheel_model_selector_summary"
+        android:dependency="range_estimation_enabled"
+        app:iconSpaceReserved="false" />
+
+    <!-- Manual Configuration (shown when mode is "manual") -->
+    <EditTextPreference
+        android:key="battery_capacity_wh"
+        android:title="@string/settings_battery_capacity"
+        android:summary="@string/settings_battery_capacity_summary"
+        android:defaultValue="2000"
+        android:inputType="number"
+        android:dependency="range_estimation_enabled"
+        app:iconSpaceReserved="false" />
+
+    <ListPreference
+        android:key="battery_cell_count"
+        android:title="@string/settings_battery_cell_count"
+        android:summary="@string/settings_battery_cell_count_summary"
+        android:entries="@array/battery_cell_count_entries"
+        android:entryValues="@array/battery_cell_count_values"
+        android:defaultValue="20"
+        android:dependency="range_estimation_enabled"
+        app:iconSpaceReserved="false" />
+
+    <ListPreference
+        android:key="range_estimation_algorithm"
+        android:title="@string/settings_range_algorithm"
+        android:summary="@string/settings_range_algorithm_summary"
+        android:entries="@array/range_estimation_algorithm_entries"
+        android:entryValues="@array/range_estimation_algorithm_values"
+        android:defaultValue="weighted_window"
+        android:dependency="range_estimation_enabled"
+        app:iconSpaceReserved="false" />
+
+    <ListPreference
+        android:key="range_estimation_preset"
+        android:title="@string/settings_range_preset"
+        android:summary="@string/settings_range_preset_summary"
+        android:entries="@array/range_estimation_preset_entries"
+        android:entryValues="@array/range_estimation_preset_values"
+        android:defaultValue="balanced"
+        android:dependency="range_estimation_enabled"
+        app:iconSpaceReserved="false" />
+
+    <Preference
+        android:key="reset_range_trip"
+        android:title="@string/settings_reset_range_trip"
+        android:summary="@string/settings_reset_range_trip_summary"
+        android:dependency="range_estimation_enabled"
+        app:iconSpaceReserved="false" />
+
+</PreferenceScreen>

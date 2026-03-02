@@ -151,8 +151,28 @@ class MainActivity : AppCompatActivity() {
     
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
-            R.id.action_settings -> {
-                startActivity(Intent(this, SettingsActivity::class.java))
+            R.id.action_settings_api -> {
+                startActivity(Intent(this, ApiSettingsActivity::class.java))
+                true
+            }
+            R.id.action_settings_general -> {
+                startActivity(Intent(this, GeneralSettingsActivity::class.java))
+                true
+            }
+            R.id.action_settings_display -> {
+                startActivity(Intent(this, DisplaySettingsActivity::class.java))
+                true
+            }
+            R.id.action_settings_range -> {
+                startActivity(Intent(this, RangeSettingsActivity::class.java))
+                true
+            }
+            R.id.action_settings_android_auto -> {
+                startActivity(Intent(this, AndroidAutoSettingsActivity::class.java))
+                true
+            }
+            R.id.action_about -> {
+                startActivity(Intent(this, AboutActivity::class.java))
                 true
             }
             R.id.action_launch_osmand -> {

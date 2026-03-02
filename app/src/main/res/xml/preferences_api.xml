@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <EditTextPreference
+        android:key="api_host"
+        android:title="@string/settings_api_host"
+        android:summary="@string/settings_api_host_summary"
+        android:defaultValue="http://localhost"
+        app:iconSpaceReserved="false" />
+
+    <EditTextPreference
+        android:key="api_port"
+        android:title="@string/settings_api_port"
+        android:summary="@string/settings_api_port_summary"
+        android:defaultValue="8080"
+        android:inputType="number"
+        app:iconSpaceReserved="false" />
+
+    <com.a42r.eucosmandplugin.ui.SeekBarWithEditTextPreference
+        android:key="poll_interval"
+        android:title="@string/settings_poll_interval"
+        android:summary="@string/settings_poll_interval_summary"
+        android:defaultValue="500"
+        app:min="100"
+        app:max="2000"
+        app:suffix="ms"
+        app:updateInterval="50"
+        app:iconSpaceReserved="false" />
+
+    <com.a42r.eucosmandplugin.ui.SeekBarWithEditTextPreference
+        android:key="wheel_disconnect_timeout"
+        android:title="@string/settings_wheel_disconnect_timeout"
+        android:summary="@string/settings_wheel_disconnect_timeout_summary"
+        android:defaultValue="15"
+        app:min="5"
+        app:max="120"
+        app:suffix="s"
+        app:updateInterval="5"
+        app:iconSpaceReserved="false" />
+
+</PreferenceScreen>

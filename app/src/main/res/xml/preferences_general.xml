@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <SwitchPreferenceCompat
+        android:key="auto_start_on_boot"
+        android:title="@string/settings_auto_start"
+        android:summary="@string/settings_auto_start_summary"
+        android:defaultValue="false"
+        app:iconSpaceReserved="false" />
+
+    <SwitchPreferenceCompat
+        android:key="hide_notification"
+        android:title="@string/settings_hide_notification"
+        android:summary="@string/settings_hide_notification_summary"
+        android:defaultValue="false"
+        app:iconSpaceReserved="false" />
+
+</PreferenceScreen>

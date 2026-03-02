@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <com.a42r.eucosmandplugin.ui.AndroidAutoIntervalPreference
+        android:key="android_auto_update_interval"
+        android:title="@string/settings_android_auto_update_interval"
+        android:summary="@string/settings_android_auto_update_interval_summary"
+        android:defaultValue="15"
+        app:iconSpaceReserved="false" />
+
+</PreferenceScreen>

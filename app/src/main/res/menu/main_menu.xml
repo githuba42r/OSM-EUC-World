@@ -9,8 +9,33 @@
         app:showAsAction="ifRoom" />
     
     <item
-        android:id="@+id/action_settings"
-        android:title="@string/action_settings"
+        android:id="@+id/action_settings_api"
+        android:title="@string/settings_category_api"
+        app:showAsAction="never" />
+    
+    <item
+        android:id="@+id/action_settings_general"
+        android:title="@string/settings_category_general"
+        app:showAsAction="never" />
+    
+    <item
+        android:id="@+id/action_settings_display"
+        android:title="@string/settings_category_display"
+        app:showAsAction="never" />
+    
+    <item
+        android:id="@+id/action_settings_range"
+        android:title="@string/settings_category_range_estimation"
+        app:showAsAction="never" />
+    
+    <item
+        android:id="@+id/action_settings_android_auto"
+        android:title="@string/settings_category_android_auto"
+        app:showAsAction="never" />
+    
+    <item
+        android:id="@+id/action_about"
+        android:title="@string/settings_category_about"
         app:showAsAction="never" />
     
 </menu>
