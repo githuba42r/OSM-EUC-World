@@ -63,6 +63,8 @@
     <string name="settings_api_port_summary">EUC World webservice port</string>
     <string name="settings_poll_interval">Update Interval</string>
     <string name="settings_poll_interval_summary">How often to fetch EUC data (milliseconds)</string>
+    <string name="settings_wheel_disconnect_timeout">Wheel Disconnect Timeout</string>
+    <string name="settings_wheel_disconnect_timeout_summary">How long to wait before considering wheel disconnected (seconds)</string>
     <string name="settings_category_general">General</string>
     <string name="settings_auto_start">Auto-start on boot</string>
     <string name="settings_auto_start_summary">Start the service automatically when device boots</string>
@@ -135,6 +137,9 @@
     <string name="range_confidence_medium">Medium confidence</string>
     <string name="range_confidence_high">High confidence</string>
     <string name="range_charging">Charging</string>
+    <string name="range_reset_confirmation_title">Reset Range Estimation?</string>
+    <string name="range_reset_confirmation_message">This will clear all range calculation data and start a new estimation. This action cannot be undone.</string>
+    <string name="range_reset_button">Reset</string>
     
     <!-- Widget -->
     <string name="widget_name">EUC Battery Status</string>

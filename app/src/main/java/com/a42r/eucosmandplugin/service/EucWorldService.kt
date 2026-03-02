@@ -215,12 +215,14 @@ class EucWorldService : LifecycleService() {
     
     private fun initializeApiClient() {
         val prefs = getSharedPreferences("euc_world_prefs", Context.MODE_PRIVATE)
+        val defaultPrefs = PreferenceManager.getDefaultSharedPreferences(this)
         val baseUrl = prefs.getString("api_base_url", EucWorldApiClient.DEFAULT_BASE_URL) 
             ?: EucWorldApiClient.DEFAULT_BASE_URL
         val port = prefs.getInt("api_port", EucWorldApiClient.DEFAULT_PORT)
+        val disconnectTimeout = defaultPrefs.getInt("wheel_disconnect_timeout", EucWorldApiClient.DEFAULT_DISCONNECT_TIMEOUT_SECONDS)
         pollIntervalMs = prefs.getLong("poll_interval", DEFAULT_POLL_INTERVAL_MS)
         
-        apiClient = EucWorldApiClient(baseUrl, port)
+        apiClient = EucWorldApiClient(baseUrl, port, disconnectTimeout)
     }
     
     private fun startPolling() {
@@ -532,5 +534,12 @@ class EucWorldService : LifecycleService() {
      */
     fun reloadRangeEstimationSettings() {
         initializeRangeEstimation()
+    }
+    
+    /**
+     * Reset range estimation trip data to start a new calculation
+     */
+    fun resetRangeEstimation() {
+        rangeEstimationManager?.resetTrip()
     }
 }

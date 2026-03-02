@@ -266,6 +266,9 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="6dp"
             android:visibility="gone"
+            android:clickable="true"
+            android:focusable="true"
+            android:longClickable="true"
             style="@style/CardStyle">
 
             <LinearLayout

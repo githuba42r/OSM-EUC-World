@@ -49,6 +49,7 @@ class MainActivity : AppCompatActivity() {
         val connectionState: StateFlow<ConnectionState>
         fun getFullRangeEstimate(): com.a42r.eucosmandplugin.range.model.RangeEstimate?
         fun triggerImmediateBroadcast()
+        fun resetRangeEstimation()
     }
     
     private var eucService: EucServiceInterface? = null
@@ -65,6 +66,7 @@ class MainActivity : AppCompatActivity() {
                 override val connectionState = realService.connectionState
                 override fun getFullRangeEstimate() = realService.getFullRangeEstimate()
                 override fun triggerImmediateBroadcast() = realService.triggerImmediateBroadcast()
+                override fun resetRangeEstimation() = realService.resetRangeEstimation()
             }
             serviceBound = true
             observeServiceData()
@@ -85,6 +87,7 @@ class MainActivity : AppCompatActivity() {
                 override val connectionState = mockService.connectionState
                 override fun getFullRangeEstimate() = mockService.getFullRangeEstimate()
                 override fun triggerImmediateBroadcast() = mockService.triggerImmediateBroadcast()
+                override fun resetRangeEstimation() = mockService.resetTrip()
             }
             serviceBound = true
             observeServiceData()
@@ -163,6 +166,13 @@ class MainActivity : AppCompatActivity() {
     private fun setupUI() {
         // Initial state
         updateUIDisconnected()
+        
+        // Setup long click on range estimate card to reset
+        binding.cardRangeEstimate.isLongClickable = true
+        binding.cardRangeEstimate.setOnLongClickListener {
+            showResetRangeEstimationConfirmation()
+            true
+        }
     }
     
     private fun setupTripMeterControls() {
@@ -619,6 +629,22 @@ class MainActivity : AppCompatActivity() {
                 tripMeterManager.clearAllTrips()
                 updateTripMeters()
                 eucService?.triggerImmediateBroadcast()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+    
+    /**
+     * Show confirmation dialog before resetting range estimation
+     */
+    private fun showResetRangeEstimationConfirmation() {
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.range_reset_confirmation_title))
+            .setMessage(getString(R.string.range_reset_confirmation_message))
+            .setPositiveButton(getString(R.string.range_reset_button)) { _, _ ->
+                eucService?.resetRangeEstimation()
+                // Update the UI immediately to reflect the reset
+                updateRangeEstimation()
             }
             .setNegativeButton("Cancel", null)
             .show()
