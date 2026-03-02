@@ -74,12 +74,16 @@ class SeekBarWithEditTextPreference @JvmOverloads constructor(
 
         val seekBar = holder.findViewById(R.id.seekbar) as SeekBar
         val valueEdit = holder.findViewById(R.id.value_edit) as EditText
+        val suffixLabel = holder.findViewById(R.id.suffix_label) as? android.widget.TextView
 
         seekBar.max = (max - min) / updateInterval
         seekBar.progress = (currentValue - min) / updateInterval
 
         valueEdit.setText(currentValue.toString())
         valueEdit.inputType = InputType.TYPE_CLASS_NUMBER
+        
+        // Set suffix if available
+        suffixLabel?.text = suffix
 
         seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {

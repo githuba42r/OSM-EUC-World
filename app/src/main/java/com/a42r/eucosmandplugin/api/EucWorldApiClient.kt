@@ -41,13 +41,15 @@ import java.util.concurrent.TimeUnit
  */
 class EucWorldApiClient(
     private val baseUrl: String = DEFAULT_BASE_URL,
-    private val port: Int = DEFAULT_PORT
+    private val port: Int = DEFAULT_PORT,
+    private val disconnectTimeoutSeconds: Int = DEFAULT_DISCONNECT_TIMEOUT_SECONDS
 ) {
     companion object {
         private const val TAG = "EucWorldApiClient"
         
         const val DEFAULT_BASE_URL = "http://127.0.0.1"
         const val DEFAULT_PORT = 8080
+        const val DEFAULT_DISCONNECT_TIMEOUT_SECONDS = 15
         
         private const val API_PATH = "/api/values"
         
@@ -222,15 +224,16 @@ class EucWorldApiClient(
                                   valueMap[KEY_BATTERY_FULL]?.a ?: 
                                   Long.MAX_VALUE
             
-            // The 'a' attribute represents the age in milliseconds when connected (< 30000ms),
+            // The 'a' attribute represents the age in milliseconds when connected,
             // but switches to Unix epoch time when disconnected (very large value).
-            // If 'a' > 30000ms, the wheel is almost certainly disconnected from EUC World.
-            val isConnectedLegacy = batteryTimestamp < 30_000L
+            // If 'a' exceeds the configured timeout (in ms), the wheel is disconnected.
+            val timeoutMs = disconnectTimeoutSeconds * 1000L
+            val isConnectedLegacy = batteryTimestamp < timeoutMs
             
             if (isConnectedLegacy) {
-                Log.d(TAG, "Using legacy timestamp-based connection detection (a=$batteryTimestamp ms)")
+                Log.d(TAG, "Using legacy timestamp-based connection detection (a=$batteryTimestamp ms, timeout=$timeoutMs ms)")
             } else {
-                Log.d(TAG, "Wheel disconnected - timestamp age exceeds threshold (a=$batteryTimestamp ms)")
+                Log.d(TAG, "Wheel disconnected - timestamp age exceeds threshold (a=$batteryTimestamp ms, timeout=$timeoutMs ms)")
             }
             
             return EucData(
@@ -308,8 +311,8 @@ class EucWorldApiClient(
     /**
      * Create a new client with different configuration
      */
-    fun withConfig(baseUrl: String, port: Int): EucWorldApiClient {
-        return EucWorldApiClient(baseUrl, port)
+    fun withConfig(baseUrl: String, port: Int, disconnectTimeoutSeconds: Int = DEFAULT_DISCONNECT_TIMEOUT_SECONDS): EucWorldApiClient {
+        return EucWorldApiClient(baseUrl, port, disconnectTimeoutSeconds)
     }
 }
 

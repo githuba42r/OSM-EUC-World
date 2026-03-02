@@ -43,7 +43,7 @@
             android:id="@+id/value_edit"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:minWidth="80dp"
+            android:minWidth="60dp"
             android:padding="8dp"
             android:gravity="end|center_vertical"
             android:textAppearance="?android:attr/textAppearanceMedium"
@@ -54,6 +54,16 @@
             android:singleLine="true"
             android:imeOptions="actionDone"
             android:background="?android:attr/editTextBackground" />
+
+        <!-- Suffix Label -->
+        <TextView
+            android:id="@+id/suffix_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:textColor="?android:attr/textColorSecondary" />
 
     </LinearLayout>
 

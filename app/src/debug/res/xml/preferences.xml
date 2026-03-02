@@ -32,6 +32,17 @@
             app:updateInterval="50"
             app:iconSpaceReserved="false" />
 
+        <com.a42r.eucosmandplugin.ui.SeekBarWithEditTextPreference
+            android:key="wheel_disconnect_timeout"
+            android:title="@string/settings_wheel_disconnect_timeout"
+            android:summary="@string/settings_wheel_disconnect_timeout_summary"
+            android:defaultValue="15"
+            app:min="5"
+            app:max="120"
+            app:suffix="s"
+            app:updateInterval="5"
+            app:iconSpaceReserved="false" />
+
     </PreferenceCategory>
 
     <PreferenceCategory
