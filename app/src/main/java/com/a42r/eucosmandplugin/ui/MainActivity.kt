@@ -6,9 +6,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
+import android.os.PowerManager
+import android.provider.Settings
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
@@ -131,6 +134,9 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         // Recreate options menu to reflect settings changes
         invalidateOptionsMenu()
+        
+        // Check battery optimization after starting the service
+        checkBatteryOptimization()
     }
     
     override fun onStop() {
@@ -668,5 +674,82 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+    
+    /**
+     * Check if battery optimization is disabled for continuous background operation.
+     * This is critical for range estimation to work correctly.
+     */
+    private fun checkBatteryOptimization() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            val packageName = packageName
+            
+            // Only prompt if battery optimization is enabled
+            if (!powerManager.isIgnoringBatteryOptimizations(packageName)) {
+                // Check if user has already dismissed this dialog (don't annoy them)
+                val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+                val dismissed = prefs.getBoolean("battery_optimization_dialog_dismissed", false)
+                
+                if (!dismissed) {
+                    showBatteryOptimizationDialog()
+                }
+            }
+        }
+    }
+    
+    /**
+     * Show dialog explaining why battery optimization should be disabled
+     */
+    private fun showBatteryOptimizationDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Battery Optimization")
+            .setMessage(
+                "For accurate range estimation, this app needs to run continuously in the background.\n\n" +
+                "Please disable battery optimization to prevent Android from stopping the data collection service.\n\n" +
+                "Without this, range estimation sampling may reset when the app is backgrounded."
+            )
+            .setPositiveButton("Open Settings") { _, _ ->
+                openBatteryOptimizationSettings()
+            }
+            .setNegativeButton("Later", null)
+            .setNeutralButton("Don't Show Again") { _, _ ->
+                // User chose to dismiss permanently
+                PreferenceManager.getDefaultSharedPreferences(this).edit()
+                    .putBoolean("battery_optimization_dialog_dismissed", true)
+                    .apply()
+            }
+            .setCancelable(true)
+            .show()
+    }
+    
+    /**
+     * Open battery optimization settings for this app
+     */
+    private fun openBatteryOptimizationSettings() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                    data = Uri.parse("package:$packageName")
+                }
+                startActivity(intent)
+            }
+        } catch (e: Exception) {
+            // Fallback to general battery optimization settings if direct intent fails
+            try {
+                val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                startActivity(intent)
+            } catch (e2: Exception) {
+                // If even that fails, show message to user
+                AlertDialog.Builder(this)
+                    .setTitle("Unable to Open Settings")
+                    .setMessage(
+                        "Please manually disable battery optimization for this app in:\n\n" +
+                        "Settings → Apps → OSM EUC World → Battery → Unrestricted"
+                    )
+                    .setPositiveButton("OK", null)
+                    .show()
+            }
+        }
     }
 }

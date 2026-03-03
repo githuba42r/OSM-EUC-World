@@ -12,6 +12,7 @@ import android.content.IntentFilter
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -107,6 +108,9 @@ class EucWorldService : LifecycleService() {
     // Range estimation enabled state
     private var rangeEstimationEnabled = false
     
+    // Wake lock for continuous background operation
+    private var wakeLock: PowerManager.WakeLock? = null
+    
     // Receiver for trip meter change broadcasts
     private val tripMeterChangeReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -149,6 +153,11 @@ class EucWorldService : LifecycleService() {
         }
         
         // Normal initialization continues...
+        
+        // Acquire wake lock for continuous background operation
+        // This prevents the CPU from sleeping and ensures continuous data sampling
+        acquireWakeLock()
+        
         createNotificationChannel()
         initializeApiClient()
         
@@ -209,6 +218,7 @@ class EucWorldService : LifecycleService() {
             stopPolling()
             osmAndHelper.disconnect()
             unregisterReceiver(tripMeterChangeReceiver)
+            releaseWakeLock()
         }
         super.onDestroy()
     }
@@ -541,5 +551,70 @@ class EucWorldService : LifecycleService() {
      */
     fun resetRangeEstimation() {
         rangeEstimationManager?.resetTrip()
+    }
+    
+    /**
+     * Acquire wake lock to keep CPU running for continuous data sampling.
+     * This is critical for range estimation to work correctly in the background.
+     */
+    private fun acquireWakeLock() {
+        try {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            wakeLock = powerManager.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK,
+                "EucWorld::RangeSamplingWakeLock"
+            ).apply {
+                acquire()
+                Log.d(TAG, "Wake lock acquired for continuous background operation")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to acquire wake lock: ${e.message}")
+        }
+    }
+    
+    /**
+     * Release wake lock when service is destroyed
+     */
+    private fun releaseWakeLock() {
+        wakeLock?.let {
+            if (it.isHeld) {
+                it.release()
+                Log.d(TAG, "Wake lock released")
+            }
+        }
+        wakeLock = null
+    }
+    
+    /**
+     * Monitor task removal (user swiping app from recents)
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        Log.w(TAG, "Task removed - app swiped away from recents. Service will restart due to START_STICKY.")
+        super.onTaskRemoved(rootIntent)
+        // Service should automatically restart due to START_STICKY
+    }
+    
+    /**
+     * Monitor memory pressure to detect when service might be killed
+     */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        when (level) {
+            TRIM_MEMORY_UI_HIDDEN -> {
+                Log.d(TAG, "UI hidden - app backgrounded (normal behavior)")
+            }
+            TRIM_MEMORY_RUNNING_MODERATE -> {
+                Log.w(TAG, "Memory pressure: moderate - service may slow down")
+            }
+            TRIM_MEMORY_RUNNING_LOW -> {
+                Log.w(TAG, "Memory pressure: low - service at risk")
+            }
+            TRIM_MEMORY_RUNNING_CRITICAL -> {
+                Log.e(TAG, "Memory pressure: CRITICAL - service may be killed soon!")
+            }
+            TRIM_MEMORY_COMPLETE -> {
+                Log.e(TAG, "Memory pressure: COMPLETE - service will likely be killed!")
+            }
+        }
     }
 }

@@ -9,6 +9,15 @@
         android:defaultValue="false"
         app:iconSpaceReserved="false" />
 
+    <!-- Battery Optimization Warning -->
+    <Preference
+        android:key="battery_optimization_warning"
+        android:title="⚠️ Background Running Required"
+        android:summary="Range estimation requires continuous background operation. Battery optimization must be disabled for accurate results. Tap to open battery settings."
+        android:persistent="false"
+        android:dependency="range_estimation_enabled"
+        app:iconSpaceReserved="false" />
+
     <!-- Wheel Configuration Mode -->
     <ListPreference
         android:key="wheel_config_mode"

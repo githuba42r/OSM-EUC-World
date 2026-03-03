@@ -4,7 +4,11 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -91,6 +95,16 @@ class RangeSettingsActivity : AppCompatActivity() {
                 }
             }
             
+            // Battery optimization warning preference
+            findPreference<Preference>("battery_optimization_warning")?.apply {
+                setOnPreferenceClickListener {
+                    openBatteryOptimizationSettings()
+                    true
+                }
+                // Update summary based on current battery optimization status
+                updateBatteryOptimizationStatus(this)
+            }
+            
             // Update detected wheel info
             updateDetectedWheelInfo()
         }
@@ -102,6 +116,11 @@ class RangeSettingsActivity : AppCompatActivity() {
                 eucDataReceiver,
                 IntentFilter(AutoProxyReceiver.ACTION_EUC_DATA_UPDATE)
             )
+            
+            // Refresh battery optimization status when returning to this screen
+            findPreference<Preference>("battery_optimization_warning")?.let { pref ->
+                updateBatteryOptimizationStatus(pref)
+            }
         }
         
         override fun onPause() {
@@ -261,6 +280,62 @@ class RangeSettingsActivity : AppCompatActivity() {
                 R.string.reset_range_trip_success,
                 Toast.LENGTH_SHORT
             ).show()
+        }
+        
+        /**
+         * Update battery optimization status in the warning preference
+         */
+        private fun updateBatteryOptimizationStatus(preference: Preference) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val powerManager = requireContext().getSystemService(Context.POWER_SERVICE) as PowerManager
+                val packageName = requireContext().packageName
+                
+                val isIgnoring = powerManager.isIgnoringBatteryOptimizations(packageName)
+                
+                if (isIgnoring) {
+                    preference.summary = "✓ Battery optimization is disabled. Range estimation will work correctly in the background."
+                    preference.title = "✓ Background Running Enabled"
+                } else {
+                    preference.summary = "⚠️ Battery optimization is enabled. Range estimation may stop when app is backgrounded. Tap to open settings."
+                    preference.title = "⚠️ Background Running Required"
+                }
+            } else {
+                // Android < M doesn't have battery optimization
+                preference.summary = "Battery optimization not applicable on this Android version."
+            }
+        }
+        
+        /**
+         * Open battery optimization settings for this app
+         */
+        private fun openBatteryOptimizationSettings() {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                try {
+                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                        data = Uri.parse("package:${requireContext().packageName}")
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    // Fallback to general battery optimization settings
+                    try {
+                        val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                        startActivity(intent)
+                    } catch (e2: Exception) {
+                        // Show toast if settings cannot be opened
+                        Toast.makeText(
+                            requireContext(),
+                            "Unable to open battery optimization settings. Please go to:\nSettings → Apps → OSM EUC World → Battery → Unrestricted",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            } else {
+                Toast.makeText(
+                    requireContext(),
+                    "Battery optimization not available on this Android version.",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
         }
     }
 }
