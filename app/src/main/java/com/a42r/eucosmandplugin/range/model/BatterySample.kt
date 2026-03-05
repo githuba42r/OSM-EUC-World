@@ -38,6 +38,15 @@ data class BatterySample(
     /** Wheel temperature in Celsius (optional, -1 if not available) */
     val temperatureCelsius: Double = -1.0,
     
+    /** GPS latitude (0.0 if not available) */
+    val latitude: Double = 0.0,
+    
+    /** GPS longitude (0.0 if not available) */
+    val longitude: Double = 0.0,
+    
+    /** GPS speed in km/h (0.0 if not available) */
+    val gpsSpeedKmh: Double = 0.0,
+    
     /** Sample quality flags (for anomaly detection) */
     val flags: Set<SampleFlag> = emptySet()
 ) {
@@ -46,6 +55,10 @@ data class BatterySample(
     
     /** Distance since previous sample (if known), used for anomaly detection */
     var distanceSincePreviousSampleKm: Double? = null
+    
+    /** Whether GPS location data is available */
+    val hasGpsLocation: Boolean
+        get() = latitude != 0.0 && longitude != 0.0
     
     /** 
      * Voltage sag amount (difference between compensated and raw voltage).

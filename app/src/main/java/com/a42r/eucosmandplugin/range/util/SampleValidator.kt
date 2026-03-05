@@ -93,10 +93,11 @@ object SampleValidator {
     ): Boolean {
         val batteryIncrease = currentSample.batteryPercent - previousSample.batteryPercent
         val voltageIncrease = currentSample.voltage - previousSample.voltage
-        val isStationary = currentSample.speedKmh < 1.0
+        val isStationary = currentSample.speedKmh < 0.5  // Nearly zero speed, not just < 1.0
         
-        // Battery/voltage increased while stationary = charging
-        return (batteryIncrease >= 3.0 || voltageIncrease >= 1.0) && isStationary
+        // Battery/voltage increased significantly while stationary = charging
+        // Increased threshold to 5% to avoid false positives from regen braking
+        return (batteryIncrease >= 5.0 || voltageIncrease >= 1.0) && isStationary
     }
     
     /**

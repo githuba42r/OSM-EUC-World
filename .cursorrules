@@ -1,0 +1,101 @@
+# OSM-EUC-World Development Guidelines
+
+This file contains important patterns and conventions that should be followed when developing this Android application.
+
+## Android Layout Guidelines
+
+### Activity Layouts with Action Bars
+
+When creating a new activity layout that uses an action bar (AppCompatActivity with `supportActionBar`), the root layout MUST include padding to prevent content from being hidden behind the action bar.
+
+**Required Pattern:**
+```xml
+<RootLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:paddingTop="?attr/actionBarSize">
+    
+    <!-- Your content here -->
+    
+</RootLayout>
+```
+
+**Examples of correct layouts:**
+- `activity_settings.xml` - Uses `FrameLayout` with `android:paddingTop="?attr/actionBarSize"`
+- `activity_developer_settings.xml` - Uses `ScrollView` with `android:paddingTop="?attr/actionBarSize"`
+
+**Why this is needed:**
+Android's action bar overlays the content by default. Without the padding, the first line or top elements of your activity will be hidden behind the action bar. The `?attr/actionBarSize` attribute references the theme's action bar height, ensuring the padding is correct regardless of device or theme settings.
+
+**When to apply this:**
+- Any new activity layout file (activity_*.xml)
+- Any activity that sets `supportActionBar?.setDisplayHomeAsUpEnabled(true)`
+- Any activity where you see content hidden behind the top bar
+
+**DO NOT apply this to:**
+- Fragment layouts (they inherit padding from their host activity)
+- Layouts that don't use an action bar
+- Layouts that use `CoordinatorLayout` with `AppBarLayout` (handles this automatically)
+
+## SharedPreferences Guidelines
+
+### Using PreferenceManager SharedPreferences
+
+When working with preferences in Activities or Fragments:
+
+**In PreferenceFragmentCompat:**
+- Use `preferenceManager.sharedPreferences` - this gets the default SharedPreferences
+- DO NOT use `requireContext().getSharedPreferences("custom_name", MODE_PRIVATE)` unless you specifically need a separate file
+
+**In regular Activities:**
+- Use `PreferenceManager.getDefaultSharedPreferences(context)` for app preferences
+- Only use custom SharedPreferences names for feature-specific data (like "range_estimation_data")
+
+**Why this matters:**
+Different SharedPreferences instances write to different files. Using inconsistent methods causes data to be stored in separate locations, leading to bugs where settings appear not to save or sync.
+
+## Developer Mode Pattern
+
+### Implementing Hidden Developer Features
+
+When implementing developer/debug features that should be hidden by default:
+
+1. **Activation**: Use a multi-click pattern on version number (typically 10 clicks)
+2. **Storage**: Store state in `developer_mode_enabled` boolean in default SharedPreferences
+3. **UI Visibility**: 
+   - For menu items: Set `android:visible="false"` in XML, toggle in `onCreateOptionsMenu()`
+   - For preferences: Set `isVisible` property dynamically in code
+   - Refresh visibility in `onResume()` methods
+4. **Multiple Access Points**: If developer settings appear in multiple places (menu, preferences, etc.), ensure ALL locations check the same `developer_mode_enabled` flag
+
+## Code Style
+
+### Logging
+- Use `android.util.Log` for debugging
+- Remove or comment out debug logs before committing to production
+- Use appropriate log levels: `Log.d()` for debug, `Log.e()` for errors, `Log.w()` for warnings
+
+### Activity Lifecycle
+- Always call `super` methods first in lifecycle callbacks
+- Use `onResume()` to refresh dynamic UI elements (menus, preferences visibility)
+- Use `invalidateOptionsMenu()` to refresh menu items when settings change
+
+## Common Patterns
+
+### Settings Activity Structure
+- Main container: `FrameLayout` with id `settings_container`
+- Background: `@color/background_dark`
+- Top padding: `?attr/actionBarSize`
+- Fragment replacement: Use `supportFragmentManager.beginTransaction()`
+
+### Menu Visibility
+- Show/hide menu items in `onCreateOptionsMenu()` based on preferences
+- Call `invalidateOptionsMenu()` in `onResume()` to refresh after settings changes
+- Read from default SharedPreferences for consistency
+
+### Material Design
+- Use MaterialCardView for grouped content
+- Use consistent corner radius (8dp)
+- Use consistent elevation (2dp for cards)
+- Use consistent padding (16dp for content, 8dp for spacing)

@@ -122,6 +122,16 @@ class EucWorldService : LifecycleService() {
         }
     }
     
+    // Receiver for range estimation parameter updates
+    private val rangeParamsUpdateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == "com.a42r.eucosmandplugin.UPDATE_RANGE_PARAMS") {
+                Log.d(TAG, "Range estimation parameters updated")
+                rangeEstimationManager?.updateSamplingParameters()
+            }
+        }
+    }
+    
     inner class LocalBinder : Binder() {
         fun getService(): EucWorldService = this@EucWorldService
     }
@@ -177,6 +187,11 @@ class EucWorldService : LifecycleService() {
         } else {
             registerReceiver(tripMeterChangeReceiver, filter)
         }
+        
+        // Register receiver for range parameter updates
+        val rangeParamsFilter = IntentFilter("com.a42r.eucosmandplugin.UPDATE_RANGE_PARAMS")
+        androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(this)
+            .registerReceiver(rangeParamsUpdateReceiver, rangeParamsFilter)
     }
     
     override fun onBind(intent: Intent): IBinder {
@@ -218,6 +233,8 @@ class EucWorldService : LifecycleService() {
             stopPolling()
             osmAndHelper.disconnect()
             unregisterReceiver(tripMeterChangeReceiver)
+            androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(this)
+                .unregisterReceiver(rangeParamsUpdateReceiver)
             releaseWakeLock()
         }
         super.onDestroy()

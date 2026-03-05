@@ -147,10 +147,15 @@ class MainActivity : AppCompatActivity() {
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
         
-        // Hide battery icon if preference is set
         val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        
+        // Hide battery icon if preference is set
         val showBatteryIcon = prefs.getBoolean("show_battery_icon", true)
         menu.findItem(R.id.action_launch_osmand)?.isVisible = showBatteryIcon
+        
+        // Show developer settings menu item if developer mode is enabled
+        val isDeveloperMode = prefs.getBoolean("developer_mode_enabled", false)
+        menu.findItem(R.id.action_developer_settings)?.isVisible = isDeveloperMode
         
         return true
     }
@@ -179,6 +184,10 @@ class MainActivity : AppCompatActivity() {
             }
             R.id.action_about -> {
                 startActivity(Intent(this, AboutActivity::class.java))
+                true
+            }
+            R.id.action_developer_settings -> {
+                startActivity(Intent(this, DeveloperSettingsActivity::class.java))
                 true
             }
             R.id.action_launch_osmand -> {

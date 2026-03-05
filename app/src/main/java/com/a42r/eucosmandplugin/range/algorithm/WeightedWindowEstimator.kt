@@ -52,14 +52,16 @@ class WeightedWindowEstimator(
     private val weightDecayFactor: Double = 0.5,
     
     /** Historical data manager for calibration (optional) */
-    private val historicalDataManager: HistoricalDataManager? = null
+    private val historicalDataManager: HistoricalDataManager? = null,
+    
+    /** Minimum time in minutes for initial baseline (configurable in developer mode) */
+    var minTimeMinutes: Double = 10.0,
+    
+    /** Minimum distance in km for initial baseline (configurable in developer mode) */
+    var minDistanceKm: Double = 10.0
 ) : RangeEstimator {
     
     companion object {
-        // Minimum requirements for estimation
-        private const val MIN_TIME_MINUTES = 10.0
-        private const val MIN_DISTANCE_KM = 10.0
-        
         // Minimum samples in window to produce estimate
         private const val MIN_WINDOW_SAMPLES = 5
         
@@ -92,14 +94,19 @@ class WeightedWindowEstimator(
             ?: return null
         val currentSample = validSamples.last()
         
-        // Calculate travel metrics
+        // Calculate travel metrics for current baseline
         val travelTimeMs = trip.getRidingTimeMsSinceBaseline()
         val travelTimeMinutes = travelTimeMs / 60000.0
         val travelDistanceKm = trip.getDistanceKmSinceBaseline()
         
-        // Check minimum requirements
-        val meetsMinimumTime = travelTimeMinutes >= MIN_TIME_MINUTES
-        val meetsMinimumDistance = travelDistanceKm >= MIN_DISTANCE_KM
+        // Check minimum requirements for current baseline
+        val meetsMinimumTime = travelTimeMinutes >= minTimeMinutes
+        val meetsMinimumDistance = travelDistanceKm >= minDistanceKm
+        
+        // Check if trip has EVER met the initial requirements (across all baselines)
+        // This prevents resetting to "Collecting data" after charging or long stops
+        val hasEverMetRequirements = trip.chargingEvents.isNotEmpty() || 
+                                     (meetsMinimumTime && meetsMinimumDistance)
         
         val dataQuality = DataQuality(
             totalSamples = trip.samples.size,
@@ -113,15 +120,29 @@ class WeightedWindowEstimator(
             meetsMinimumDistance = meetsMinimumDistance
         )
         
-        // Return insufficient data if neither requirement met
-        if (!meetsMinimumTime && !meetsMinimumDistance) {
+        // Return insufficient data ONLY if trip has never met requirements
+        // Once initial stage is complete, we should continue using available data
+        if (!hasEverMetRequirements && !meetsMinimumTime && !meetsMinimumDistance) {
+            val diagnostics = EstimateDiagnostics(
+                statusReason = "Insufficient data: Need ${minTimeMinutes}min and ${minDistanceKm}km. " +
+                        "Current: ${String.format("%.1f", travelTimeMinutes)}min, ${String.format("%.2f", travelDistanceKm)}km",
+                minTimeMinutes = minTimeMinutes,
+                minDistanceKm = minDistanceKm,
+                hasEverMetRequirements = hasEverMetRequirements,
+                notes = listOf(
+                    "Collecting initial data",
+                    "Time progress: ${String.format("%.0f", dataQuality.timeProgress * 100)}%",
+                    "Distance progress: ${String.format("%.0f", dataQuality.distanceProgress * 100)}%"
+                )
+            )
             return RangeEstimate(
                 rangeKm = null,
                 confidence = 0.0,
                 status = EstimateStatus.INSUFFICIENT_DATA,
                 efficiencyWhPerKm = null,
                 estimatedTimeMinutes = null,
-                dataQuality = dataQuality
+                dataQuality = dataQuality,
+                diagnostics = diagnostics
             )
         }
         
@@ -147,13 +168,31 @@ class WeightedWindowEstimator(
         if (weightedEfficiency.isNaN() || 
             weightedEfficiency <= MIN_EFFICIENCY || 
             weightedEfficiency >= MAX_EFFICIENCY) {
+            val reason = when {
+                weightedEfficiency.isNaN() -> "Efficiency calculation returned NaN (no valid samples with distance delta)"
+                weightedEfficiency <= MIN_EFFICIENCY -> "Efficiency too low: ${String.format("%.1f", weightedEfficiency)} Wh/km (min: $MIN_EFFICIENCY)"
+                else -> "Efficiency too high: ${String.format("%.1f", weightedEfficiency)} Wh/km (max: $MAX_EFFICIENCY)"
+            }
+            val diagnostics = EstimateDiagnostics(
+                statusReason = reason,
+                windowSampleCount = samplesForEstimation.size,
+                windowMinutes = windowMinutes,
+                minTimeMinutes = minTimeMinutes,
+                minDistanceKm = minDistanceKm,
+                hasEverMetRequirements = hasEverMetRequirements,
+                notes = listOf(
+                    "Valid samples in window: ${samplesForEstimation.size}",
+                    "Efficiency value: ${if (weightedEfficiency.isNaN()) "NaN" else String.format("%.2f", weightedEfficiency)} Wh/km"
+                )
+            )
             return RangeEstimate(
                 rangeKm = null,
                 confidence = 0.0,
                 status = EstimateStatus.INSUFFICIENT_DATA,
                 efficiencyWhPerKm = if (weightedEfficiency.isNaN()) null else weightedEfficiency,
                 estimatedTimeMinutes = null,
-                dataQuality = dataQuality
+                dataQuality = dataQuality,
+                diagnostics = diagnostics
             )
         }
         
@@ -197,13 +236,15 @@ class WeightedWindowEstimator(
         
         // Determine status based on confidence and data requirements
         val status = when {
-            !meetsMinimumTime || !meetsMinimumDistance -> EstimateStatus.COLLECTING  // One requirement met, generating estimates
+            // If we've ever met requirements (trip completed initial stage), don't show COLLECTING
+            // even if current baseline is rebuilding data after charging
+            !hasEverMetRequirements && (!meetsMinimumTime || !meetsMinimumDistance) -> EstimateStatus.COLLECTING
             confidence < 0.5 -> EstimateStatus.LOW_CONFIDENCE
             else -> EstimateStatus.VALID
         }
         
         // Calculate estimated time (using recent speed average for smoothing)
-        val estimatedTimeMinutes = if (samplesForEstimation.isNotEmpty()) {
+        val (estimatedTimeMinutes, avgSpeed) = if (samplesForEstimation.isNotEmpty()) {
             // Use average speed from last 2 minutes (or up to 120 samples)
             val recentSamples = samplesForEstimation.takeLast(120)
             val recentSpeed = recentSamples
@@ -212,13 +253,57 @@ class WeightedWindowEstimator(
                 .average()
             
             if (recentSpeed > 1.0) {
-                (estimatedRangeKm / recentSpeed) * 60.0
+                Pair((estimatedRangeKm / recentSpeed) * 60.0, recentSpeed)
             } else {
-                null
+                Pair(null, 0.0)
             }
         } else {
-            null
+            Pair(null, 0.0)
         }
+        
+        // Build diagnostics for logging
+        val calibrationUsed = historicalDataManager != null
+        val calibrationFactor = if (calibrationUsed) estimatedRangeKm / baseEstimatedRangeKm else 1.0
+        
+        val statusReason = when (status) {
+            EstimateStatus.COLLECTING -> "Collecting data: Need ${minTimeMinutes}min and ${minDistanceKm}km. " +
+                    "Current: ${String.format("%.1f", travelTimeMinutes)}min, ${String.format("%.2f", travelDistanceKm)}km"
+            EstimateStatus.LOW_CONFIDENCE -> "Low confidence: confidence=${String.format("%.2f", confidence)} (threshold: 0.5), " +
+                    "stdDev=${String.format("%.2f", efficiencyStdDev)} Wh/km"
+            EstimateStatus.VALID -> "Valid estimate: confidence=${String.format("%.2f", confidence)}, " +
+                    "efficiency=${String.format("%.2f", weightedEfficiency)} Wh/km"
+            else -> "Unknown status: $status"
+        }
+        
+        val diagnostics = EstimateDiagnostics(
+            statusReason = statusReason,
+            windowSampleCount = samplesForEstimation.size,
+            windowMinutes = windowMinutes,
+            efficiencyStdDev = efficiencyStdDev,
+            compensatedVoltage = currentSample.compensatedVoltage,
+            remainingEnergyWh = remainingEnergyWh,
+            currentEnergyPercent = currentEnergy,
+            baseRangeKm = baseEstimatedRangeKm,
+            calibrationFactor = calibrationFactor,
+            usedHistoricalCalibration = calibrationUsed,
+            currentSpeedKmh = avgSpeed,
+            minTimeMinutes = minTimeMinutes,
+            minDistanceKm = minDistanceKm,
+            hasEverMetRequirements = hasEverMetRequirements,
+            notes = buildList {
+                add("Algorithm: Weighted Window (window=${windowMinutes}min, decay=${weightDecayFactor})")
+                add("Samples in window: ${samplesForEstimation.size} (total valid: ${validSamples.size})")
+                add("Energy: ${String.format("%.1f", currentEnergy)}% = ${String.format("%.1f", remainingEnergyWh)} Wh")
+                add("Efficiency: ${String.format("%.2f", weightedEfficiency)} Wh/km ± ${String.format("%.2f", efficiencyStdDev)} Wh/km")
+                add("Base range: ${String.format("%.2f", baseEstimatedRangeKm)} km")
+                if (calibrationUsed) {
+                    add("Calibration: ${String.format("%.3f", calibrationFactor)}x = ${String.format("%.2f", estimatedRangeKm)} km")
+                }
+                if (avgSpeed > 1.0) {
+                    add("Average speed: ${String.format("%.1f", avgSpeed)} km/h")
+                }
+            }
+        )
         
         return RangeEstimate(
             rangeKm = estimatedRangeKm,
@@ -226,7 +311,8 @@ class WeightedWindowEstimator(
             status = status,
             efficiencyWhPerKm = weightedEfficiency,
             estimatedTimeMinutes = estimatedTimeMinutes,
-            dataQuality = dataQuality
+            dataQuality = dataQuality,
+            diagnostics = diagnostics
         )
     }
     

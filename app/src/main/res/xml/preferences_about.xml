@@ -5,7 +5,8 @@
     <Preference
         android:key="app_version"
         android:title="@string/settings_version"
-        android:selectable="false"
+        android:selectable="true"
+        android:background="@null"
         app:iconSpaceReserved="false" />
 
     <Preference
@@ -25,6 +26,12 @@
         android:key="github_project"
         android:title="@string/settings_github"
         android:summary="@string/settings_github_summary"
+        app:iconSpaceReserved="false" />
+    
+    <Preference
+        android:key="developer_settings"
+        android:title="Developer Settings"
+        android:summary="Advanced diagnostics and data capture"
         app:iconSpaceReserved="false" />
 
 </PreferenceScreen>

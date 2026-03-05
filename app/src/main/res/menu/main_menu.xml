@@ -38,4 +38,10 @@
         android:title="@string/settings_category_about"
         app:showAsAction="never" />
     
+    <item
+        android:id="@+id/action_developer_settings"
+        android:title="Developer Settings"
+        android:visible="false"
+        app:showAsAction="never" />
+    
 </menu>

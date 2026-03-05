@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- Developer Mode Toggle -->
+    <PreferenceCategory
+        android:title="Developer Mode"
+        app:iconSpaceReserved="false">
+        
+        <SwitchPreference
+            android:key="developer_mode_enabled"
+            android:title="Developer Mode Enabled"
+            android:summary="Disable to hide developer settings. Re-enable by clicking version number 10 times in About screen."
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
+    <!-- Range Estimation Sampling Parameters -->
+    <PreferenceCategory
+        android:title="Range Estimation Sampling"
+        android:summary="Minimum sampling requirements for initial baseline"
+        app:iconSpaceReserved="false">
+
+        <com.a42r.eucosmandplugin.ui.SamplingTimePreference
+            android:key="dev_min_time_minutes"
+            android:title="Minimum Time"
+            android:summary="Minimum time requirement for initial range estimate"
+            android:defaultValue="10.0"
+            app:iconSpaceReserved="false" />
+
+        <com.a42r.eucosmandplugin.ui.SamplingDistancePreference
+            android:key="dev_min_distance_km"
+            android:title="Minimum Distance"
+            android:summary="Minimum distance requirement for initial range estimate"
+            android:defaultValue="10.0"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="sampling_info"
+            android:selectable="false"
+            android:summary="Changes take effect immediately. If on an active trip, the estimation will update based on new thresholds."
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
+    <!-- Data Capture Settings -->
+    <PreferenceCategory
+        android:title="Data Capture"
+        app:iconSpaceReserved="false">
+
+        <SwitchPreference
+            android:key="developer_logging_enabled"
+            android:title="Enable Logging"
+            android:summary="Captures all battery samples and range estimates for post-trip analysis. A new log file is created when you reset the trip."
+            android:defaultValue="false"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="view_logs"
+            android:title="Trip Logs"
+            android:summary="View and manage captured trip logs"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
+</PreferenceScreen>

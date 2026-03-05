@@ -38,7 +38,13 @@ data class RangeEstimate(
     val estimatedTimeMinutes: Double? = null,
     
     /** Data quality metrics for this estimate */
-    val dataQuality: DataQuality
+    val dataQuality: DataQuality,
+    
+    /** 
+     * Diagnostic information about the calculation (for logging/debugging).
+     * Null in production, populated in developer mode.
+     */
+    val diagnostics: EstimateDiagnostics? = null
 ) {
     /** Whether this estimate is valid and should be displayed */
     val isValid: Boolean
@@ -142,3 +148,54 @@ data class DataQuality(
     val distanceProgress: Double
         get() = (travelDistanceKm / 10.0).coerceAtMost(1.0)
 }
+
+/**
+ * Diagnostic information about an estimate calculation.
+ * Used for detailed logging in developer mode to help diagnose issues.
+ */
+data class EstimateDiagnostics(
+    /** Reason for the current status */
+    val statusReason: String,
+    
+    /** Number of samples used in the calculation window */
+    val windowSampleCount: Int? = null,
+    
+    /** Window size in minutes (if windowing was used) */
+    val windowMinutes: Int? = null,
+    
+    /** Calculated efficiency standard deviation */
+    val efficiencyStdDev: Double? = null,
+    
+    /** Current compensated voltage */
+    val compensatedVoltage: Double? = null,
+    
+    /** Remaining energy in Wh */
+    val remainingEnergyWh: Double? = null,
+    
+    /** Current energy percentage */
+    val currentEnergyPercent: Double? = null,
+    
+    /** Base range before calibration */
+    val baseRangeKm: Double? = null,
+    
+    /** Calibration factor applied (if any) */
+    val calibrationFactor: Double? = null,
+    
+    /** Whether historical calibration was used */
+    val usedHistoricalCalibration: Boolean = false,
+    
+    /** Current speed in km/h (for time estimation) */
+    val currentSpeedKmh: Double? = null,
+    
+    /** Minimum time requirement (in minutes) */
+    val minTimeMinutes: Double? = null,
+    
+    /** Minimum distance requirement (in km) */
+    val minDistanceKm: Double? = null,
+    
+    /** Whether trip has ever met initial requirements */
+    val hasEverMetRequirements: Boolean? = null,
+    
+    /** Additional diagnostic notes */
+    val notes: List<String> = emptyList()
+)

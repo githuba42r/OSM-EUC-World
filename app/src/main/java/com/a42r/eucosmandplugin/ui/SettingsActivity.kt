@@ -96,9 +96,52 @@ class SettingsActivity : AppCompatActivity() {
                 setDefaultValue(false)
             }
             
-            // App version
+            // App version (with developer mode activation)
             findPreference<Preference>("app_version")?.apply {
                 summary = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
+                var clickCount = 0
+                var lastClickTime = 0L
+                
+                setOnPreferenceClickListener {
+                    val currentTime = System.currentTimeMillis()
+                    
+                    // Reset counter if more than 3 seconds between clicks
+                    if (currentTime - lastClickTime > 3000) {
+                        clickCount = 0
+                    }
+                    
+                    clickCount++
+                    lastClickTime = currentTime
+                    
+                    // Check if already in developer mode
+                    val prefs = preferenceManager.sharedPreferences
+                    val isDeveloperMode = prefs?.getBoolean("developer_mode_enabled", false) ?: false
+                    
+                    if (clickCount >= 10) {
+                        // Activate developer mode
+                        if (!isDeveloperMode) {
+                            prefs?.edit()?.putBoolean("developer_mode_enabled", true)?.apply()
+                            Toast.makeText(requireContext(), "Developer mode enabled!", Toast.LENGTH_SHORT).show()
+                            
+                            // Refresh preferences to show developer options
+                            preferenceScreen.removeAll()
+                            onCreatePreferences(null, null)
+                        } else {
+                            Toast.makeText(requireContext(), "Developer mode already enabled", Toast.LENGTH_SHORT).show()
+                        }
+                        clickCount = 0
+                    } else {
+                        // Show progress feedback on every click (for testing visibility)
+                        val remaining = 10 - clickCount
+                        Toast.makeText(
+                            requireContext(), 
+                            "Developer mode activating - $clickCount/10 clicks", 
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                    
+                    true
+                }
             }
             
             // Build date
@@ -145,6 +188,9 @@ class SettingsActivity : AppCompatActivity() {
             
             // Mock mode configuration
             setupMockModeSettings()
+            
+            // Developer mode settings
+            setupDeveloperModeSettings()
         }
         
         override fun onRequestPermissionsResult(
@@ -177,6 +223,9 @@ class SettingsActivity : AppCompatActivity() {
                 eucDataReceiver,
                 IntentFilter(AutoProxyReceiver.ACTION_EUC_DATA_UPDATE)
             )
+            
+            // Refresh developer mode settings visibility in case it was toggled
+            setupDeveloperModeSettings()
         }
         
         override fun onPause() {
@@ -401,6 +450,35 @@ class SettingsActivity : AppCompatActivity() {
                     arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION),
                     REQUEST_LOCATION_PERMISSION
                 )
+            }
+        }
+        
+        private fun setupDeveloperModeSettings() {
+            val prefs = preferenceManager.sharedPreferences
+            val isDeveloperMode = prefs?.getBoolean("developer_mode_enabled", false) ?: false
+            
+            android.util.Log.d("SettingsActivity", "setupDeveloperModeSettings: isDeveloperMode=$isDeveloperMode")
+            
+            val devPref = findPreference<Preference>("developer_settings")
+            android.util.Log.d("SettingsActivity", "developer_settings Preference found: ${devPref != null}")
+            
+            if (devPref != null) {
+                if (isDeveloperMode) {
+                    // Show the preference
+                    devPref.isVisible = true
+                    devPref.setOnPreferenceClickListener {
+                        android.util.Log.d("SettingsActivity", "Developer settings clicked")
+                        startActivity(Intent(requireContext(), DeveloperSettingsActivity::class.java))
+                        true
+                    }
+                    android.util.Log.d("SettingsActivity", "Developer settings made visible")
+                } else {
+                    // Hide the preference
+                    devPref.isVisible = false
+                    android.util.Log.d("SettingsActivity", "Developer settings hidden")
+                }
+            } else {
+                android.util.Log.e("SettingsActivity", "developer_settings preference NOT FOUND!")
             }
         }
         

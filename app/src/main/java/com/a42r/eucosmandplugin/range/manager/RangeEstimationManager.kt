@@ -13,6 +13,7 @@ import com.a42r.eucosmandplugin.range.algorithm.*
 import com.a42r.eucosmandplugin.range.database.WheelDatabase
 import com.a42r.eucosmandplugin.range.model.*
 import com.a42r.eucosmandplugin.range.util.SampleValidator
+import com.a42r.eucosmandplugin.range.util.DataCaptureLogger
 import com.google.gson.Gson
 
 /**
@@ -58,8 +59,9 @@ class RangeEstimationManager(
         
         // Charging detection thresholds
         private const val CHARGING_VOLTAGE_INCREASE_THRESHOLD = 0.5 // V
-        private const val CHARGING_BATTERY_INCREASE_THRESHOLD = 1.0 // %
+        private const val CHARGING_BATTERY_INCREASE_THRESHOLD = 5.0 // % - increased from 1.0 to avoid false positives from regen braking
         private const val CHARGING_DISTANCE_CHANGE_THRESHOLD = 0.01 // km
+        private const val CHARGING_SPEED_THRESHOLD = 0.5 // km/h - must be nearly stationary (not just < 1.0)
         
         // Estimation update intervals based on battery level
         private const val ESTIMATION_UPDATE_INTERVAL_HIGH_BATTERY_MS = 5 * 60 * 1000L // 5 minutes for top 50% battery
@@ -97,6 +99,7 @@ class RangeEstimationManager(
     private var tripSnapshot = TripSnapshot.createInitial()
     private var lastSample: BatterySample? = null
     private var previousCompensatedVoltage: Double? = null
+    private var isWheelConnected: Boolean = false
     
     // Estimation update throttling
     private var lastEstimationTimestamp: Long = 0L
@@ -123,6 +126,9 @@ class RangeEstimationManager(
     private val milestones = mutableListOf<BatteryMilestone>()
     private var lastMilestonePercent: Int = 100
     
+    // Data capture logger for developer mode
+    private lateinit var dataCaptureLogger: DataCaptureLogger
+    
     // Estimator instances
     private lateinit var simpleLinearEstimator: SimpleLinearEstimator
     private lateinit var weightedWindowEstimator: WeightedWindowEstimator
@@ -144,6 +150,9 @@ class RangeEstimationManager(
         
         // Initialize historical data manager
         historicalDataManager = HistoricalDataManager(context)
+        
+        // Initialize data capture logger
+        dataCaptureLogger = DataCaptureLogger(context)
         
         // Initialize estimators with current settings
         initializeEstimators()
@@ -178,9 +187,27 @@ class RangeEstimationManager(
     /**
      * Reset trip (manual reset from user).
      * Creates new trip with fresh baseline.
+     * Also triggers a new log capture if logging is enabled AND wheel is connected.
      */
     fun resetTrip() {
         Log.d(TAG, "Manual trip reset")
+        
+        // Close current log and start new one (if logging enabled AND wheel is connected)
+        if (dataCaptureLogger.isLoggingEnabled()) {
+            dataCaptureLogger.closeCurrentLog()
+            
+            if (isWheelConnected) {
+                dataCaptureLogger.startNewLog()
+                dataCaptureLogger.logEvent("trip_reset", mapOf(
+                    "reason" to "manual_reset",
+                    "previousSampleCount" to tripSnapshot.samples.size
+                ))
+                Log.d(TAG, "Started new log capture for trip")
+            } else {
+                Log.d(TAG, "Wheel not connected - logging will start when wheel connects and data is received")
+            }
+        }
+        
         tripSnapshot = TripSnapshot.createInitial()
         lastSample = null
         previousCompensatedVoltage = null
@@ -237,10 +264,16 @@ class RangeEstimationManager(
             prefs.getString(PREF_CELL_COUNT, null)?.toIntOrNull()
         } ?: DEFAULT_CELL_COUNT
         
+        // Read developer mode sampling parameters
+        val minTimeMinutes = prefs.getFloat("dev_min_time_minutes", 10f).toDouble()
+        val minDistanceKm = prefs.getFloat("dev_min_distance_km", 10f).toDouble()
+        
         simpleLinearEstimator = SimpleLinearEstimator(
             batteryCapacityWh = batteryCapacity,
             cellCount = cellCount,
-            historicalDataManager = historicalDataManager
+            historicalDataManager = historicalDataManager,
+            minTimeMinutes = minTimeMinutes,
+            minDistanceKm = minDistanceKm
         )
         
         weightedWindowEstimator = WeightedWindowEstimator(
@@ -248,10 +281,34 @@ class RangeEstimationManager(
             cellCount = cellCount,
             windowMinutes = 30,  // Balanced preset
             weightDecayFactor = 0.5,
-            historicalDataManager = historicalDataManager
+            historicalDataManager = historicalDataManager,
+            minTimeMinutes = minTimeMinutes,
+            minDistanceKm = minDistanceKm
         )
         
-        Log.d(TAG, "Estimators initialized: battery=${batteryCapacity}Wh, cells=${cellCount}S")
+        Log.d(TAG, "Estimators initialized: battery=${batteryCapacity}Wh, cells=${cellCount}S, minTime=${minTimeMinutes}min, minDist=${minDistanceKm}km")
+    }
+    
+    /**
+     * Update sampling parameters for active estimators.
+     * Called when developer changes parameters in Developer Settings.
+     */
+    fun updateSamplingParameters() {
+        val minTimeMinutes = prefs.getFloat("dev_min_time_minutes", 10f).toDouble()
+        val minDistanceKm = prefs.getFloat("dev_min_distance_km", 10f).toDouble()
+        
+        simpleLinearEstimator.minTimeMinutes = minTimeMinutes
+        simpleLinearEstimator.minDistanceKm = minDistanceKm
+        weightedWindowEstimator.minTimeMinutes = minTimeMinutes
+        weightedWindowEstimator.minDistanceKm = minDistanceKm
+        
+        Log.d(TAG, "Sampling parameters updated: minTime=${minTimeMinutes}min, minDist=${minDistanceKm}km")
+        
+        // Re-run estimation immediately with new parameters
+        val estimate = runEstimation()
+        if (estimate != null) {
+            _rangeEstimate.value = estimate
+        }
     }
     
     /**
@@ -271,6 +328,9 @@ class RangeEstimationManager(
      */
     private fun processSample(eucData: EucData) {
         val currentTimestamp = System.currentTimeMillis()
+        
+        // Track wheel connection state for logging
+        isWheelConnected = eucData.isConnected
         
         // Step 1: Auto-detect wheel configuration if in 'auto' mode
         autoDetectWheelConfiguration(eucData)
@@ -307,6 +367,15 @@ class RangeEstimationManager(
             Log.d(TAG, "Wheel reconnected after ${gapDuration}ms disconnection")
             handleConnectionGap(lastSample!!, eucData, gapDuration)
             disconnectionStartTimestamp = null
+            
+            // Start logging if enabled but not currently active (e.g., after trip reset while disconnected)
+            if (dataCaptureLogger.isLoggingEnabled() && !dataCaptureLogger.isCurrentlyLogging()) {
+                dataCaptureLogger.startNewLog()
+                dataCaptureLogger.logEvent("wheel_reconnected", mapOf(
+                    "gapDurationMs" to gapDuration
+                ))
+                Log.d(TAG, "Started new log capture after wheel reconnection")
+            }
         }
         
         lastConnectionState = true
@@ -350,6 +419,9 @@ class RangeEstimationManager(
         // Step 9: Add to trip state
         addSampleToTrip(validatedSample)
         
+        // Step 9.3: Log sample to data capture (if enabled)
+        dataCaptureLogger.logSample(validatedSample)
+        
         // Step 9.5: Track battery milestones for historical calibration
         trackBatteryMilestone(validatedSample)
         
@@ -357,8 +429,63 @@ class RangeEstimationManager(
         val shouldRunEstimation = shouldRunEstimation(currentTimestamp, sample.batteryPercent)
         
         if (shouldRunEstimation) {
+            // Get the algorithm name for logging
+            val algorithm = prefs.getString(PREF_ALGORITHM, DEFAULT_ALGORITHM) ?: DEFAULT_ALGORITHM
+            val previousStatus = _rangeEstimate.value?.status
+            
             // Run estimation algorithm
             val estimate = runEstimation()
+            
+            // Log estimate to data capture with detailed reasoning (if enabled)
+            if (estimate != null) {
+                // Log detailed estimate with calculation reasoning
+                val diagnostics = estimate.diagnostics
+                if (diagnostics != null) {
+                    val reasoningMap = mapOf(
+                        "statusReason" to diagnostics.statusReason,
+                        "windowSampleCount" to diagnostics.windowSampleCount,
+                        "windowMinutes" to diagnostics.windowMinutes,
+                        "efficiencyStdDev" to diagnostics.efficiencyStdDev,
+                        "compensatedVoltage" to diagnostics.compensatedVoltage,
+                        "remainingEnergyWh" to diagnostics.remainingEnergyWh,
+                        "currentEnergyPercent" to diagnostics.currentEnergyPercent,
+                        "baseRangeKm" to diagnostics.baseRangeKm,
+                        "calibrationFactor" to diagnostics.calibrationFactor,
+                        "usedHistoricalCalibration" to diagnostics.usedHistoricalCalibration,
+                        "currentSpeedKmh" to diagnostics.currentSpeedKmh,
+                        "minTimeMinutes" to diagnostics.minTimeMinutes,
+                        "minDistanceKm" to diagnostics.minDistanceKm,
+                        "hasEverMetRequirements" to diagnostics.hasEverMetRequirements,
+                        "notes" to diagnostics.notes
+                    )
+                    dataCaptureLogger.logEstimateWithReasoning(estimate, algorithm, reasoningMap)
+                } else {
+                    // Fallback to simple logging if no diagnostics
+                    dataCaptureLogger.logEstimate(estimate)
+                }
+                
+                // Log status transition if status changed
+                if (previousStatus != null && previousStatus != estimate.status) {
+                    val transitionReason = estimate.diagnostics?.statusReason ?: "Status changed"
+                    val transitionDetails = mapOf(
+                        "previousStatus" to previousStatus.name,
+                        "newStatus" to estimate.status.name,
+                        "rangeKm" to estimate.rangeKm,
+                        "confidence" to estimate.confidence,
+                        "efficiencyWhPerKm" to estimate.efficiencyWhPerKm,
+                        "travelTimeMinutes" to estimate.dataQuality.travelTimeMinutes,
+                        "travelDistanceKm" to estimate.dataQuality.travelDistanceKm,
+                        "meetsMinimumTime" to estimate.dataQuality.meetsMinimumTime,
+                        "meetsMinimumDistance" to estimate.dataQuality.meetsMinimumDistance
+                    )
+                    dataCaptureLogger.logStatusTransition(
+                        fromStatus = previousStatus.name,
+                        toStatus = estimate.status.name,
+                        reason = transitionReason,
+                        details = transitionDetails
+                    )
+                }
+            }
             
             // Emit estimate
             _rangeEstimate.value = estimate
@@ -500,6 +627,9 @@ class RangeEstimationManager(
                     speedKmh = lastSample.speedKmh + (currentSample.speedKmh - lastSample.speedKmh) * progress,
                     powerWatts = lastSample.powerWatts + (currentSample.powerWatts - lastSample.powerWatts) * progress,
                     currentAmps = lastSample.currentAmps + (currentSample.currentAmps - lastSample.currentAmps) * progress,
+                    latitude = lastSample.latitude + (currentSample.latitude - lastSample.latitude) * progress,
+                    longitude = lastSample.longitude + (currentSample.longitude - lastSample.longitude) * progress,
+                    gpsSpeedKmh = lastSample.gpsSpeedKmh + (currentSample.gpsSpeedKmh - lastSample.gpsSpeedKmh) * progress,
                     flags = setOf(SampleFlag.INTERPOLATED)
                 )
                 
@@ -536,9 +666,30 @@ class RangeEstimationManager(
         val batteryIncrease = sample.batteryPercent - last.batteryPercent
         val distanceChange = sample.tripDistanceKm - last.tripDistanceKm
         
+        // Check if stationary using multiple signals for better accuracy
+        val wheelSpeedStationary = sample.speedKmh < CHARGING_SPEED_THRESHOLD
+        val gpsStationary = if (sample.hasGpsLocation && last.hasGpsLocation) {
+            // Calculate GPS distance moved (Haversine formula for small distances)
+            val latDiff = Math.abs(sample.latitude - last.latitude)
+            val lonDiff = Math.abs(sample.longitude - last.longitude)
+            val distanceMoved = Math.sqrt(latDiff * latDiff + lonDiff * lonDiff) * 111.32 // Rough km conversion
+            val gpsSpeedLow = sample.gpsSpeedKmh < CHARGING_SPEED_THRESHOLD
+            distanceMoved < 0.01 && gpsSpeedLow  // Moved less than 10 meters
+        } else {
+            wheelSpeedStationary  // Fall back to wheel speed if no GPS
+        }
+        
+        // Use GPS stationary check if available, otherwise fall back to wheel speed
+        val isStationary = if (sample.hasGpsLocation && last.hasGpsLocation) {
+            gpsStationary
+        } else {
+            wheelSpeedStationary
+        }
+        
         val chargingIndicators = (voltageIncrease > CHARGING_VOLTAGE_INCREASE_THRESHOLD ||
                                   batteryIncrease > CHARGING_BATTERY_INCREASE_THRESHOLD) &&
-                                  distanceChange < CHARGING_DISTANCE_CHANGE_THRESHOLD
+                                  distanceChange < CHARGING_DISTANCE_CHANGE_THRESHOLD &&
+                                  isStationary
         
         // Check if sample has charging flag
         val eucDataCharging = sample.flags.contains(SampleFlag.CHARGING_DETECTED)
@@ -548,7 +699,7 @@ class RangeEstimationManager(
                 if (chargingIndicators || eucDataCharging) {
                     chargingState = ChargingState.CHARGING_SUSPECTED
                     chargingSuspectedSample = sample
-                    Log.d(TAG, "Charging suspected")
+                    Log.d(TAG, "Charging suspected (GPS=${sample.hasGpsLocation})")
                 }
             }
             
@@ -556,7 +707,14 @@ class RangeEstimationManager(
                 if (chargingIndicators || eucDataCharging) {
                     // Confirm charging
                     chargingState = ChargingState.CHARGING_CONFIRMED
-                    Log.d(TAG, "Charging confirmed")
+                    Log.d(TAG, "Charging confirmed (GPS=${sample.hasGpsLocation})")
+                    
+                    // Log charging start event
+                    dataCaptureLogger.logEvent("charging_start", mapOf(
+                        "voltageBeforeCharging" to last.voltage,
+                        "batteryPercentBefore" to last.batteryPercent,
+                        "hasGpsLocation" to sample.hasGpsLocation
+                    ))
                     
                     // Create charging event
                     val chargingEvent = ChargingEvent(
@@ -600,6 +758,15 @@ class RangeEstimationManager(
                         tripSnapshot = tripSnapshot.copy(
                             chargingEvents = tripSnapshot.chargingEvents.dropLast(1) + updatedEvent
                         )
+                        
+                        // Log charging end event
+                        dataCaptureLogger.logEvent("charging_end", mapOf(
+                            "voltageAfterCharging" to sample.voltage,
+                            "batteryPercentAfter" to sample.batteryPercent,
+                            "voltageGain" to (sample.voltage - lastChargingEvent.voltageBeforeCharging),
+                            "batteryPercentGain" to (sample.batteryPercent - lastChargingEvent.batteryPercentBefore),
+                            "chargingDurationMs" to (sample.timestamp - lastChargingEvent.startTimestamp)
+                        ))
                     }
                     
                     // Create new NORMAL_RIDING baseline segment
@@ -721,6 +888,9 @@ class RangeEstimationManager(
             powerWatts = eucData.power,
             currentAmps = eucData.current,
             temperatureCelsius = eucData.temperature,
+            latitude = eucData.latitude,
+            longitude = eucData.longitude,
+            gpsSpeedKmh = eucData.gpsSpeed,
             flags = flags
         )
     }

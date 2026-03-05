@@ -112,6 +112,20 @@
             android:exported="false"
             android:label="@string/settings_category_about"
             android:parentActivityName=".ui.MainActivity" />
+        
+        <!-- Developer Settings Activity -->
+        <activity
+            android:name=".ui.DeveloperSettingsActivity"
+            android:exported="false"
+            android:label="Developer Settings"
+            android:parentActivityName=".ui.SettingsActivity" />
+        
+        <!-- Trip Logs Activity -->
+        <activity
+            android:name=".ui.TripLogsActivity"
+            android:exported="false"
+            android:label="Trip Logs"
+            android:parentActivityName=".ui.DeveloperSettingsActivity" />
 
         <!-- EUC World Data Service -->
         <service
@@ -187,6 +201,17 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/euc_battery_widget_info" />
         </receiver>
+        
+        <!-- FileProvider for sharing log files -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_provider_paths" />
+        </provider>
 
         <!-- Android Auto Metadata -->
         <meta-data
