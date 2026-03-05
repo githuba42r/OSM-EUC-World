@@ -90,8 +90,6 @@ class WeightedWindowEstimator(
             return null
         }
         
-        val startSample = baselineSegment.samples.firstOrNull()
-            ?: return null
         val currentSample = validSamples.last()
         
         // Calculate travel metrics for current baseline

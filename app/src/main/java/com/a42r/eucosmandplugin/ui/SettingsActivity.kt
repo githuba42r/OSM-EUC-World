@@ -132,7 +132,6 @@ class SettingsActivity : AppCompatActivity() {
                         clickCount = 0
                     } else {
                         // Show progress feedback on every click (for testing visibility)
-                        val remaining = 10 - clickCount
                         Toast.makeText(
                             requireContext(), 
                             "Developer mode activating - $clickCount/10 clicks", 
@@ -193,11 +192,13 @@ class SettingsActivity : AppCompatActivity() {
             setupDeveloperModeSettings()
         }
         
+        @Deprecated("Deprecated in Java")
         override fun onRequestPermissionsResult(
             requestCode: Int,
             permissions: Array<out String>,
             grantResults: IntArray
         ) {
+            @Suppress("DEPRECATION")
             super.onRequestPermissionsResult(requestCode, permissions, grantResults)
             
             if (requestCode == REQUEST_LOCATION_PERMISSION) {
@@ -446,6 +447,7 @@ class SettingsActivity : AppCompatActivity() {
             ) == android.content.pm.PackageManager.PERMISSION_GRANTED
             
             if (!hasPermission) {
+                @Suppress("DEPRECATION")
                 requestPermissions(
                     arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION),
                     REQUEST_LOCATION_PERMISSION

@@ -265,7 +265,6 @@ class VoltageCompensatorTest {
                 83.0, 500.0, compensated
             )
         }
-        val afterCruise = compensated
         
         // Sudden acceleration (voltage sags, high power)
         compensated = VoltageCompensator.calculateCompensatedVoltage(

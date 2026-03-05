@@ -64,6 +64,7 @@ class MockLocationProvider(
             handleLocationUpdate(location)
         }
         
+        @Deprecated("Deprecated in Java")
         override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {
             Log.d(TAG, "Location provider status changed: $provider = $status")
         }
@@ -234,7 +235,7 @@ class MockLocationProvider(
         val distance = lastLoc.distanceTo(currentLocation)
         
         // Calculate time delta (in seconds)
-        val timeDelta = (currentTime - (lastLoc.time ?: currentTime)) / 1000.0
+        val timeDelta = (currentTime - lastLoc.time) / 1000.0
         
         if (timeDelta <= 0.0) return 0.0
         

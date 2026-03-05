@@ -182,11 +182,12 @@ class EucWorldService : LifecycleService() {
         
         // Register receiver for trip meter changes
         val filter = IntentFilter(TripMeterManager.ACTION_TRIP_METER_CHANGED)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(tripMeterChangeReceiver, filter, RECEIVER_NOT_EXPORTED)
-        } else {
-            registerReceiver(tripMeterChangeReceiver, filter)
-        }
+        androidx.core.content.ContextCompat.registerReceiver(
+            this,
+            tripMeterChangeReceiver,
+            filter,
+            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
+        )
         
         // Register receiver for range parameter updates
         val rangeParamsFilter = IntentFilter("com.a42r.eucosmandplugin.UPDATE_RANGE_PARAMS")
@@ -260,7 +261,7 @@ class EucWorldService : LifecycleService() {
         pollingJob = lifecycleScope.launch {
             // Use full data filter to get all metrics including wheel model
             apiClient.eucDataFlow(pollIntervalMs, batteryOnly = false)
-                .catch { e ->
+                .catch { _ ->
                     _connectionState.value = ConnectionState.ERROR
                     _eucDataState.value = null
                     _latestData = null
@@ -290,7 +291,7 @@ class EucWorldService : LifecycleService() {
                             // Broadcast update to widgets and OsmAnd
                             broadcastUpdate(data)
                         },
-                        onFailure = { error ->
+                        onFailure = { _ ->
                             _connectionState.value = ConnectionState.ERROR
                             _eucDataState.value = null
                             _latestData = null
@@ -531,7 +532,7 @@ class EucWorldService : LifecycleService() {
     /**
      * Update range estimation - handled automatically by manager observing eucDataState
      */
-    private fun updateRangeEstimation(data: EucData) {
+    private fun updateRangeEstimation(@Suppress("UNUSED_PARAMETER") data: EucData) {
         // No-op: RangeEstimationManager observes eucDataState directly
     }
     
@@ -620,15 +621,19 @@ class EucWorldService : LifecycleService() {
             TRIM_MEMORY_UI_HIDDEN -> {
                 Log.d(TAG, "UI hidden - app backgrounded (normal behavior)")
             }
+            @Suppress("DEPRECATION")
             TRIM_MEMORY_RUNNING_MODERATE -> {
                 Log.w(TAG, "Memory pressure: moderate - service may slow down")
             }
+            @Suppress("DEPRECATION")
             TRIM_MEMORY_RUNNING_LOW -> {
                 Log.w(TAG, "Memory pressure: low - service at risk")
             }
+            @Suppress("DEPRECATION")
             TRIM_MEMORY_RUNNING_CRITICAL -> {
                 Log.e(TAG, "Memory pressure: CRITICAL - service may be killed soon!")
             }
+            @Suppress("DEPRECATION")
             TRIM_MEMORY_COMPLETE -> {
                 Log.e(TAG, "Memory pressure: COMPLETE - service will likely be killed!")
             }

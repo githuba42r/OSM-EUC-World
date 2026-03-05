@@ -28,10 +28,11 @@ class EucWorldApplication : Application() {
             addAction(AutoProxyReceiver.ACTION_REQUEST_UNSUBSCRIBE)
         }
         
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(autoProxyReceiver, filter, RECEIVER_NOT_EXPORTED)
-        } else {
-            registerReceiver(autoProxyReceiver, filter)
-        }
+        androidx.core.content.ContextCompat.registerReceiver(
+            this,
+            autoProxyReceiver,
+            filter,
+            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
+        )
     }
 }

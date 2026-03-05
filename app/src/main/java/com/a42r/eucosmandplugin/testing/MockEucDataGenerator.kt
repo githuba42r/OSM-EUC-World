@@ -204,7 +204,7 @@ class MockEucDataGenerator(
         previousSpeedKmh: Double,
         altitudeChange: Double,
         distanceTraveled: Double,
-        deltaTimeSeconds: Double
+        @Suppress("UNUSED_PARAMETER") deltaTimeSeconds: Double
     ): Double {
         // If stopped, return minimal power (idle consumption)
         if (speedKmh < 1.0) {
