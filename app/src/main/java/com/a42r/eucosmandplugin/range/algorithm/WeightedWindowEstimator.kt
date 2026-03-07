@@ -144,10 +144,11 @@ class WeightedWindowEstimator(
             )
         }
         
-        // Filter samples within time window
-        val windowMs = windowMinutes * 60 * 1000L
-        val windowStartTime = currentSample.timestamp - windowMs
-        val windowSamples = validSamples.filter { it.timestamp >= windowStartTime }
+        // Use sample-based window instead of time-based window
+        // This ensures stops don't affect the window - only actual riding samples count
+        // Target: equivalent to ~10 minutes of riding at 2 samples/sec = 1200 samples
+        val targetWindowSamples = 1200
+        val windowSamples = validSamples.takeLast(targetWindowSamples)
         
         // Use all valid samples if window is too small
         val samplesForEstimation = if (windowSamples.size >= MIN_WINDOW_SAMPLES) {
@@ -156,11 +157,34 @@ class WeightedWindowEstimator(
             validSamples
         }
         
-        // Calculate weighted average efficiency
-        val weightedEfficiency = calculateWeightedAverageEfficiency(
+        // Calculate recent window efficiency (detects current conditions like hills, traffic)
+        val recentEfficiency = calculateWeightedAverageEfficiency(
             samples = samplesForEstimation,
             latestTimestamp = currentSample.timestamp
         )
+        
+        // Calculate overall trip efficiency (represents typical riding style)
+        val overallEfficiency = calculateWeightedAverageEfficiency(
+            samples = validSamples,
+            latestTimestamp = currentSample.timestamp
+        )
+        
+        // Blend recent and overall efficiency
+        // The blend factor depends on how much data we have:
+        // - More recent samples = trust recent more (temporary conditions may be real)
+        // - Fewer recent samples = trust overall more (recent may be anomaly)
+        val recentWeight = calculateRecentWeight(samplesForEstimation.size, validSamples.size)
+        val overallWeight = 1.0 - recentWeight
+        
+        val weightedEfficiency = if (!recentEfficiency.isNaN() && !overallEfficiency.isNaN()) {
+            recentEfficiency * recentWeight + overallEfficiency * overallWeight
+        } else if (!recentEfficiency.isNaN()) {
+            recentEfficiency
+        } else if (!overallEfficiency.isNaN()) {
+            overallEfficiency
+        } else {
+            Double.NaN
+        }
         
         // Check if efficiency is valid
         if (weightedEfficiency.isNaN() || 
@@ -263,6 +287,10 @@ class WeightedWindowEstimator(
         val calibrationUsed = historicalDataManager != null
         val calibrationFactor = if (calibrationUsed) estimatedRangeKm / baseEstimatedRangeKm else 1.0
         
+        // Calculate blend info for diagnostics
+        val recentWeightForDiagnostics = calculateRecentWeight(samplesForEstimation.size, validSamples.size)
+        val overallWeightForDiagnostics = 1.0 - recentWeightForDiagnostics
+        
         val statusReason = when (status) {
             EstimateStatus.COLLECTING -> "Collecting data: Need ${minTimeMinutes}min and ${minDistanceKm}km. " +
                     "Current: ${String.format("%.1f", travelTimeMinutes)}min, ${String.format("%.2f", travelDistanceKm)}km"
@@ -289,10 +317,20 @@ class WeightedWindowEstimator(
             minDistanceKm = minDistanceKm,
             hasEverMetRequirements = hasEverMetRequirements,
             notes = buildList {
-                add("Algorithm: Weighted Window (window=${windowMinutes}min, decay=${weightDecayFactor})")
-                add("Samples in window: ${samplesForEstimation.size} (total valid: ${validSamples.size})")
+                add("Algorithm: Weighted Window (window=1200 samples, decay=${weightDecayFactor})")
+                add("Samples: ${samplesForEstimation.size} recent (total: ${validSamples.size})")
                 add("Energy: ${String.format("%.1f", currentEnergy)}% = ${String.format("%.1f", remainingEnergyWh)} Wh")
-                add("Efficiency: ${String.format("%.2f", weightedEfficiency)} Wh/km ± ${String.format("%.2f", efficiencyStdDev)} Wh/km")
+                
+                // Show efficiency blend details
+                if (!recentEfficiency.isNaN() && !overallEfficiency.isNaN()) {
+                    add("Efficiency blend:")
+                    add("  Recent (${String.format("%.0f", recentWeightForDiagnostics * 100)}%): ${String.format("%.2f", recentEfficiency)} Wh/km")
+                    add("  Overall (${String.format("%.0f", overallWeightForDiagnostics * 100)}%): ${String.format("%.2f", overallEfficiency)} Wh/km")
+                    add("  Blended: ${String.format("%.2f", weightedEfficiency)} Wh/km ± ${String.format("%.2f", efficiencyStdDev)} Wh/km")
+                } else {
+                    add("Efficiency: ${String.format("%.2f", weightedEfficiency)} Wh/km ± ${String.format("%.2f", efficiencyStdDev)} Wh/km")
+                }
+                
                 add("Base range: ${String.format("%.2f", baseEstimatedRangeKm)} km")
                 if (calibrationUsed) {
                     add("Calibration: ${String.format("%.3f", calibrationFactor)}x = ${String.format("%.2f", estimatedRangeKm)} km")
@@ -332,16 +370,45 @@ class WeightedWindowEstimator(
     ): Double {
         if (samples.isEmpty()) return Double.NaN
         
+        // Require minimum sample count (at least 25 seconds of riding at 2 Hz)
+        if (samples.size < 50) return Double.NaN
+        
+        // Require minimum distance traveled in window (at least 500m)
+        val distanceTraveled = (samples.maxOfOrNull { it.tripDistanceKm } ?: 0.0) - 
+                              (samples.minOfOrNull { it.tripDistanceKm } ?: 0.0)
+        if (distanceTraveled < 0.5) return Double.NaN
+        
+        // Collect all valid efficiency values (including negative for regen braking)
+        val validEfficiencies = samples
+            .map { it.instantEfficiencyWhPerKm }
+            .filter { !it.isNaN() && it > -MAX_EFFICIENCY && it < MAX_EFFICIENCY }
+        
+        if (validEfficiencies.size < 50) return Double.NaN
+        
+        // Apply IQR-based outlier filtering to remove extreme acceleration/braking
+        // Sort efficiencies to find quartiles
+        val sortedEfficiencies = validEfficiencies.sorted()
+        val q1Index = (sortedEfficiencies.size * 0.25).toInt()
+        val q3Index = (sortedEfficiencies.size * 0.75).toInt()
+        val q1 = sortedEfficiencies[q1Index]
+        val q3 = sortedEfficiencies[q3Index]
+        val iqr = q3 - q1
+        
+        // Define outlier bounds: Q1 - 1.5*IQR and Q3 + 1.5*IQR
+        // This is a standard statistical method that keeps ~99.3% of normal data
+        val lowerBound = q1 - 1.5 * iqr
+        val upperBound = q3 + 1.5 * iqr
+        
         var weightedSum = 0.0
         var weightSum = 0.0
         
         samples.forEach { sample ->
             val efficiency = sample.instantEfficiencyWhPerKm
             
-            // Only use valid efficiency values
+            // Filter: valid values within outlier bounds
             if (!efficiency.isNaN() && 
-                efficiency > MIN_EFFICIENCY && 
-                efficiency < MAX_EFFICIENCY) {
+                efficiency >= lowerBound && 
+                efficiency <= upperBound) {
                 
                 // Calculate age in minutes
                 val ageSeconds = (latestTimestamp - sample.timestamp) / 1000.0
@@ -373,7 +440,7 @@ class WeightedWindowEstimator(
     ): Double {
         val validEfficiencies = samples
             .map { it.instantEfficiencyWhPerKm }
-            .filter { !it.isNaN() && it > MIN_EFFICIENCY && it < MAX_EFFICIENCY }
+            .filter { !it.isNaN() && it > -MAX_EFFICIENCY && it < MAX_EFFICIENCY }
         
         if (validEfficiencies.size < 2) return 0.0
         
@@ -418,6 +485,38 @@ class WeightedWindowEstimator(
         // Weighted average
         return (varianceConfidence * VARIANCE_WEIGHT) +
                (min(sampleConfidence, min(distanceConfidence, timeConfidence)) * SAMPLE_WEIGHT)
+    }
+    
+    /**
+     * Calculate weight for recent efficiency vs overall trip efficiency.
+     * 
+     * This balances between:
+     * - Recent window (detects temporary conditions: hills, traffic, terrain changes)
+     * - Overall trip (represents typical long-term riding style)
+     * 
+     * Strategy:
+     * - Early in trip: Use mostly overall (not enough data to distinguish temporary vs typical)
+     * - Mid trip: Balanced blend (50/50) - recent conditions matter but overall is baseline
+     * - Long trip with full window: Still favor overall (60/40) to avoid overreacting to hills
+     * 
+     * @param recentSampleCount Number of samples in recent window
+     * @param totalSampleCount Total samples in trip
+     * @return Weight for recent efficiency (0.0 to 0.5), overall gets remainder
+     */
+    private fun calculateRecentWeight(recentSampleCount: Int, totalSampleCount: Int): Double {
+        // If we don't have a full window yet, use mostly overall
+        if (recentSampleCount < 1200) {
+            return 0.2  // 20% recent, 80% overall
+        }
+        
+        // If trip is very short (< 2x window), use mostly overall
+        if (totalSampleCount < 2400) {
+            return 0.3  // 30% recent, 70% overall
+        }
+        
+        // For normal trips with full window: favor overall to avoid overreacting to temporary conditions
+        // This means hills, traffic bursts, etc. influence estimate but don't dominate it
+        return 0.4  // 40% recent, 60% overall
     }
     
     /**

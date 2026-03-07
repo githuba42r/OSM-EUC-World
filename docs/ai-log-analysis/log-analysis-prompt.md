@@ -143,10 +143,13 @@ Enhanced range estimate with diagnostic information and calculation reasoning.
     "minDistanceKm": 10.0,
     "hasEverMetRequirements": true,
     "notes": [
-      "Algorithm: Weighted Window (window=30min, decay=0.5)",
-      "Samples in window: 360 (total valid: 1200)",
+      "Algorithm: Weighted Window (window=1200 samples, decay=0.5)",
+      "Samples: 360 recent (total: 1200)",
       "Energy: 73.7% = 1473.2 Wh",
-      "Efficiency: 32.5 Wh/km ± 2.1 Wh/km",
+      "Efficiency blend:",
+      "  Recent (40%): 35.2 Wh/km",
+      "  Overall (60%): 30.8 Wh/km",
+      "  Blended: 32.5 Wh/km ± 2.1 Wh/km",
       "Base range: 45.3 km"
     ]
   }
@@ -162,8 +165,10 @@ Enhanced range estimate with diagnostic information and calculation reasoning.
 - `STALE`: No new data received recently
 
 **Algorithm values:**
-- `weighted_window`: Exponential decay weighting (default, more adaptive)
+- `weighted_window`: Exponential decay weighting with hybrid blend (default, more adaptive) - **Updated March 2026**
 - `simple_linear`: Linear calculation from start to now (more stable)
+
+**Note:** As of March 2026, the `weighted_window` algorithm uses a hybrid efficiency approach that blends recent window (last 1200 samples) with overall trip efficiency. See "Algorithm Implementation Details" section below for complete information.
 
 #### 5. `status_transition` (type: "status_transition")
 Logs when the estimation status changes (e.g., COLLECTING → VALID).
@@ -317,14 +322,24 @@ If there's an issue, correlate with:
 **Investigation steps:**
 1. Plot `rangeKm` values over time from `estimate_detailed` entries
 2. Track `confidence` and `efficiencyStdDev` progression
-3. Look for changes in riding conditions (speed, terrain via efficiency changes)
-4. Check for connection gaps or interpolated samples increasing
-5. Compare `baseRangeKm` vs final `rangeKm` (calibration effect)
+3. Check `reasoning.notes` for Recent vs Overall efficiency values
+4. Look for divergence between recent and overall efficiency (indicates changing conditions)
+5. Identify what caused the change: speed variations, terrain (hills), traffic patterns
+6. Check for connection gaps or interpolated samples increasing
 
 **Expected findings:**
 - Confidence drop correlates with increased `efficiencyStdDev`
-- Riding style changed (highway → city, flat → hills)
+- Recent efficiency diverged from overall due to temporary conditions (hill climb, traffic)
+- Hybrid blend is working correctly: recent detects change, overall prevents overreaction
 - Connection issues caused data quality degradation
+- After temporary condition ends, estimates should stabilize back toward overall baseline
+
+**Example from March 2026:**
+- Overall trip: 24 Wh/km (flat highway riding)
+- Hit steep hill: Recent spikes to 45 Wh/km
+- Blended becomes: 32 Wh/km (0.4×45 + 0.6×24)
+- Range estimate drops temporarily but not excessively
+- After hill, consumption returns to 24 Wh/km and range estimate recovers
 
 ### Scenario 3: "Why did the range estimate jump suddenly?"
 **Investigation steps:**
@@ -484,13 +499,179 @@ These could be adjusted in Developer Settings for faster/slower initial estimate
 
 7. **Battery Capacity**: The algorithm uses a configured battery capacity (typically 1800-2400 Wh). If this is wrong, all range estimates will be proportionally off.
 
+## Algorithm Implementation Details (March 2026 Update)
+
+### Efficiency Calculation Algorithm
+
+As of March 2026, the `WeightedWindowEstimator` uses a **hybrid efficiency blend** approach to balance recent conditions with overall trip patterns:
+
+#### Key Implementation Details:
+
+1. **Sample-Based Window (not time-based)**
+   - Uses last 1200 samples (~10 minutes of riding at 2 Hz)
+   - Stops do NOT dilute the window - only actual riding samples count
+   - Window size remains constant during stops, updates gradually when riding resumes
+
+2. **IQR Outlier Filtering**
+   - Uses Interquartile Range (IQR) statistical method to filter extreme outliers
+   - Bounds: Q1 - 1.5×IQR to Q3 + 1.5×IQR
+   - Removes extreme acceleration and braking events that aren't representative
+   - Includes negative efficiency values (regenerative braking) within bounds
+   - Hard acceleration and regenerative braking naturally balance out
+
+3. **Hybrid Efficiency Blend**
+   - Calculates TWO efficiency values:
+     - **Recent efficiency**: Last 1200 samples (detects current conditions)
+     - **Overall efficiency**: All trip samples (represents typical riding style)
+   - Blends them with intelligent weighting:
+     - Early trip (< 1200 samples): 20% recent, 80% overall
+     - Short trip (< 2400 samples): 30% recent, 70% overall
+     - Normal trip: **40% recent, 60% overall**
+   - This prevents temporary conditions (hills, traffic) from dominating the prediction
+
+4. **Why Hybrid Matters**
+   - Temporary high consumption (hill climbs) shouldn't predict future consumption
+   - Temporary low consumption (downhills, coasting) shouldn't inflate range estimates
+   - Overall trip efficiency is the best baseline predictor
+   - Recent window detects real changes in conditions but doesn't overreact
+
+#### Example from Real Trip Log (March 6, 2026):
+
+**Trip Segments:**
+1. Before dinner: Smooth highway riding → 23.02 Wh/km overall
+2. After dinner: Efficient riding → 21.60 Wh/km overall  
+3. Hill climb: Steep extended climb → 44.75 Wh/km recent, 24.68 Wh/km overall
+
+**At end of hill climb (63% battery):**
+- Recent only approach: 44.75 Wh/km → 45 km range (too pessimistic)
+- Hybrid approach: 32.71 Wh/km blended → **61.6 km range** (realistic)
+- After hill, consumption returns to ~25 Wh/km baseline
+
+**Key Insight:** The hybrid blend correctly recognizes that the hill climb is temporary, not the new normal for the rest of the trip.
+
+### Diagnostic Note Fields in estimate_detailed
+
+When analyzing logs from March 2026 onwards, `estimate_detailed` entries contain efficiency blend details:
+
+```json
+"notes": [
+  "Algorithm: Weighted Window (window=1200 samples, decay=0.5)",
+  "Samples: 1200 recent (total: 5467)",
+  "Energy: 78.0% = 2496.0 Wh",
+  "Efficiency blend:",
+  "  Recent (40%): 29.40 Wh/km",
+  "  Overall (60%): 23.02 Wh/km",
+  "  Blended: 25.57 Wh/km ± 2.1 Wh/km",
+  "Base range: 97.6 km"
+]
+```
+
+### Common Misdiagnosis to Avoid
+
+**Incorrect:** "The range estimate is wrong because it's using 32 Wh/km but the trip average is 25 Wh/km"
+
+**Correct Analysis:** "The blended efficiency is 32 Wh/km because:
+- Recent window (40%) shows 44 Wh/km due to current hill climb
+- Overall trip (60%) shows 25 Wh/km typical efficiency
+- Blend: 0.4×44 + 0.6×25 = 32.6 Wh/km
+- This is correct - the system is adapting to the hill but not overreacting"
+
+## Trip Context Gathering
+
+**IMPORTANT:** Before analyzing a log file, ALWAYS ask the user for trip context. This information is critical for accurate diagnosis and understanding whether the algorithm is behaving correctly.
+
+### Required Questions to Ask User:
+
+1. **Trip Structure**
+   - "Can you describe the trip segments? (e.g., highway ride, city streets, mixed)"
+   - "What times did each segment occur?"
+   - "Were there any major route changes during the trip?"
+
+2. **Terrain and Conditions**
+   - "Were there any significant hill climbs or descents?"
+   - "If yes, approximately what time did they occur and how long did they last?"
+   - "Was the terrain mostly flat, hilly, or mixed?"
+   - "What were the road conditions? (smooth highway, rough pavement, bike paths)"
+
+3. **Riding Style**
+   - "Was your riding style consistent throughout, or did it change?"
+   - "Were there any periods of particularly aggressive or conservative riding?"
+   - "What was your typical speed range for each segment?"
+
+4. **Stops and Breaks**
+   - "How many stops did you make during the trip?"
+   - "What were the approximate times and durations of stops?"
+   - "Did you charge during any stops?"
+   - "Were any stops particularly long (> 30 minutes)?"
+
+5. **Environmental Factors**
+   - "What was the weather like? (wind direction/strength, temperature)"
+   - "Was there significant headwind or tailwind?"
+   - "What was the traffic situation? (smooth flow, stop-and-go, congested)"
+
+6. **Expected vs Actual**
+   - "What range did the app estimate at different points in the trip?"
+   - "Did the estimates seem too high, too low, or about right?"
+   - "What was your expected range based on past experience?"
+   - "Did anything about the estimates surprise you?"
+
+### Using Trip Context in Analysis
+
+After gathering context, cross-reference with log data:
+
+1. **Correlate efficiency changes with reported conditions**
+   - High recent efficiency during reported hill climb times → Correct behavior
+   - Low efficiency during reported downhill → Check if negative values present
+   - Efficiency spikes matching reported aggressive riding → Expected
+
+2. **Validate blend weighting decisions**
+   - After long hill climb, check if overall trip efficiency prevents overreaction
+   - During consistent riding, recent and overall should converge
+   - After stops, check window doesn't have too few samples
+
+3. **Assess estimate accuracy given conditions**
+   - Don't compare estimate to overall trip average if conditions changed
+   - Consider whether temporary conditions (hills) are still ongoing
+   - Factor in expected return to baseline after temporary conditions end
+
+4. **Identify algorithm improvements**
+   - If user describes recurring pattern that algorithm doesn't handle well
+   - If blend weights seem inappropriate for the specific scenario
+   - If outlier filtering removes too many or too few samples
+
+### Example Context-Informed Analysis:
+
+```
+User Context:
+- 6:30 PM - 7:30 PM: Highway riding, mostly flat
+- 7:30 PM - 8:30 PM: Dinner stop (no charging)
+- 8:30 PM - 9:30 PM: Mixed riding, some hills
+- 9:30 PM - 10:22 PM: Steep hill climb, very strenuous
+
+Log Analysis with Context:
+At 10:22 PM (end of trip):
+- Recent window: 44.75 Wh/km (matches reported steep hill climb ✓)
+- Overall trip: 24.68 Wh/km (matches early highway riding ✓)
+- Blended: 32.71 Wh/km (40% recent, 60% overall)
+- Range estimate: 61.6 km at 63% battery
+
+Assessment: CORRECT BEHAVIOR
+- Algorithm correctly detected the hill climb (recent spike to 44.75 Wh/km)
+- Hybrid blend prevented overreaction (didn't predict 44.75 Wh/km for remaining trip)
+- 60% weight on overall trip efficiency is appropriate since hill is temporary
+- If user continues on flat terrain, consumption will return to ~25 Wh/km baseline
+- Current range estimate is conservative but realistic given mixed conditions ahead
+```
+
 ## Getting Started
 
 To analyze a log file:
-1. I will provide you with the log file contents
-2. You should parse it line by line
-3. Identify the entry types and build a timeline
-4. Answer my specific questions or perform requested analysis
-5. Provide detailed findings with supporting evidence from the logs
+1. **FIRST:** Ask user for trip context using the questions above
+2. I will provide you with the log file contents
+3. Parse it line by line and build a timeline
+4. Cross-reference log data with user-provided trip context
+5. Answer specific questions or perform requested analysis
+6. Provide detailed findings with supporting evidence from both logs and trip context
+7. Assess whether algorithm behavior is correct given the real-world conditions
 
 Ready to analyze logs!
