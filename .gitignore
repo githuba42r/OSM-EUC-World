@@ -86,3 +86,4 @@ play-service-account.json
 # Auto-generated release notes
 RELEASE_NOTES.txt
 app/src/main/play/release-notes/
+logs/
