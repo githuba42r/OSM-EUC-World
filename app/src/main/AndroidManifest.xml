@@ -120,6 +120,26 @@
             android:label="Developer Settings"
             android:parentActivityName=".ui.SettingsActivity" />
         
+        <!-- AI OAuth Settings Activity -->
+        <activity
+            android:name=".ai.ui.OAuthActivity"
+            android:exported="true"
+            android:label="AI Configuration"
+            android:theme="@style/Theme.OsmAndEUCWorld.NoActionBar"
+            android:parentActivityName=".ui.RangeSettingsActivity"
+            android:launchMode="singleTask">
+            <!-- Deep link for OAuth callback -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="osmeucworld"
+                    android:host="oauth"
+                    android:pathPrefix="/callback" />
+            </intent-filter>
+        </activity>
+        
         <!-- Trip Logs Activity -->
         <activity
             android:name=".ui.TripLogsActivity"

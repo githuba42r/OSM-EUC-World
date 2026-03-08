@@ -50,7 +50,7 @@ class MainActivity : AppCompatActivity() {
     private interface EucServiceInterface {
         val eucDataState: StateFlow<EucData?>
         val connectionState: StateFlow<ConnectionState>
-        fun getFullRangeEstimate(): com.a42r.eucosmandplugin.range.model.RangeEstimate?
+        fun getFullRangeEstimate(): com.a42r.eucosmandplugin.ai.model.AIRangeEstimate?
         fun triggerImmediateBroadcast()
         fun resetRangeEstimation()
     }
@@ -471,14 +471,30 @@ class MainActivity : AppCompatActivity() {
         
         binding.cardRangeEstimate.visibility = View.VISIBLE
         
-        val estimate = eucService?.getFullRangeEstimate()
+        val aiRangeEstimate = eucService?.getFullRangeEstimate()
         
-        if (estimate == null) {
+        if (aiRangeEstimate == null) {
             // No estimate available yet
             binding.tvRangeEstimate.text = "-- km"
             binding.tvRangeEstimate.setTextColor(getColor(R.color.text_disabled))
             binding.tvRangeConfidence.text = getString(R.string.range_collecting_data)
             return
+        }
+        
+        // Use AI estimate if available, otherwise use baseline
+        val estimate = aiRangeEstimate.baselineEstimate
+        if (estimate == null) {
+            binding.tvRangeEstimate.text = "-- km"
+            binding.tvRangeEstimate.setTextColor(getColor(R.color.text_disabled))
+            binding.tvRangeConfidence.text = getString(R.string.range_collecting_data)
+            return
+        }
+        
+        // Determine which range to display (AI or baseline)
+        val displayRangeKm = if (aiRangeEstimate.useAI && aiRangeEstimate.aiEnhancedEstimate != null) {
+            aiRangeEstimate.aiEnhancedEstimate.rangeKm
+        } else {
+            estimate.rangeKm
         }
         
         // Handle different estimate statuses
@@ -504,13 +520,18 @@ class MainActivity : AppCompatActivity() {
             com.a42r.eucosmandplugin.range.model.EstimateStatus.VALID,
             com.a42r.eucosmandplugin.range.model.EstimateStatus.LOW_CONFIDENCE -> {
                 // Show range estimate
-                val rangeKm = estimate.rangeKm
-                if (rangeKm != null) {
+                if (displayRangeKm != null) {
                     val useMetric = prefs.getBoolean("use_metric", true)
-                    val rangeValue = if (useMetric) rangeKm else rangeKm * 0.621371
+                    val rangeValue = if (useMetric) displayRangeKm else displayRangeKm * 0.621371
                     val unit = if (useMetric) "km" else "mi"
                     
-                    binding.tvRangeEstimate.text = String.format("%.1f %s", rangeValue, unit)
+                    // Show AI indicator if using AI
+                    val rangeText = if (aiRangeEstimate.useAI && aiRangeEstimate.aiEnhancedEstimate != null) {
+                        String.format("%.1f %s ✨", rangeValue, unit) // ✨ indicates AI enhancement
+                    } else {
+                        String.format("%.1f %s", rangeValue, unit)
+                    }
+                    binding.tvRangeEstimate.text = rangeText
                     
                     // Show confidence level with data collection progress for COLLECTING status
                     val dataQuality = estimate.dataQuality
@@ -526,11 +547,24 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                         else -> {
-                            val confidence = estimate.confidence
-                            when {
+                            // Use AI confidence if available, otherwise baseline confidence
+                            val confidence = if (aiRangeEstimate.useAI && aiRangeEstimate.aiEnhancedEstimate != null) {
+                                aiRangeEstimate.aiEnhancedEstimate.confidence
+                            } else {
+                                estimate.confidence
+                            }
+                            
+                            val confidenceLabel = when {
                                 confidence >= 0.8 -> getString(R.string.range_confidence_high)
                                 confidence >= 0.5 -> getString(R.string.range_confidence_medium)
                                 else -> getString(R.string.range_confidence_low)
+                            }
+                            
+                            // Add AI indicator to confidence text
+                            if (aiRangeEstimate.useAI && aiRangeEstimate.aiEnhancedEstimate != null) {
+                                "$confidenceLabel (AI)"
+                            } else {
+                                confidenceLabel
                             }
                         }
                     }
@@ -541,7 +575,11 @@ class MainActivity : AppCompatActivity() {
                         com.a42r.eucosmandplugin.range.model.EstimateStatus.COLLECTING -> 
                             getColor(R.color.text_secondary)  // Lower confidence while collecting
                         else -> {
-                            val confidence = estimate.confidence
+                            val confidence = if (aiRangeEstimate.useAI && aiRangeEstimate.aiEnhancedEstimate != null) {
+                                aiRangeEstimate.aiEnhancedEstimate.confidence
+                            } else {
+                                estimate.confidence
+                            }
                             when {
                                 confidence >= 0.8 -> getColor(R.color.battery_good)
                                 confidence >= 0.5 -> getColor(R.color.battery_warning)

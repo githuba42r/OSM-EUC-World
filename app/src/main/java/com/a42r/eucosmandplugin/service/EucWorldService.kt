@@ -538,22 +538,34 @@ class EucWorldService : LifecycleService() {
     
     /**
      * Get current range estimate (in km), or null if not available
+     * If AI is available, returns AI estimate, otherwise baseline
      */
     fun getCurrentRangeEstimate(): Double? {
-        return rangeEstimationManager?.rangeEstimate?.value?.rangeKm
+        val aiEstimate = rangeEstimationManager?.rangeEstimate?.value
+        return if (aiEstimate?.useAI == true && aiEstimate.aiEnhancedEstimate != null) {
+            aiEstimate.aiEnhancedEstimate.rangeKm
+        } else {
+            aiEstimate?.baselineEstimate?.rangeKm
+        }
     }
     
     /**
      * Get range estimation confidence (0.0 to 1.0), or null if not available
+     * If AI is available, returns AI confidence, otherwise baseline confidence
      */
     fun getRangeEstimationConfidence(): Double? {
-        return rangeEstimationManager?.rangeEstimate?.value?.confidence
+        val aiEstimate = rangeEstimationManager?.rangeEstimate?.value
+        return if (aiEstimate?.useAI == true && aiEstimate.aiEnhancedEstimate != null) {
+            aiEstimate.aiEnhancedEstimate.confidence
+        } else {
+            aiEstimate?.baselineEstimate?.confidence
+        }
     }
     
     /**
-     * Get the full RangeEstimate object with status and data quality
+     * Get the full RangeEstimate for detailed display
      */
-    fun getFullRangeEstimate(): com.a42r.eucosmandplugin.range.model.RangeEstimate? {
+    fun getFullRangeEstimate(): com.a42r.eucosmandplugin.ai.model.AIRangeEstimate? {
         return rangeEstimationManager?.rangeEstimate?.value
     }
     

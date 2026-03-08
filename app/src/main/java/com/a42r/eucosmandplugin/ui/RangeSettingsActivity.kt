@@ -17,7 +17,10 @@ import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
+import androidx.preference.SwitchPreferenceCompat
 import com.a42r.eucosmandplugin.R
+import com.a42r.eucosmandplugin.ai.data.TokenManager
+import com.a42r.eucosmandplugin.ai.ui.OAuthActivity
 import com.a42r.eucosmandplugin.api.EucData
 import com.a42r.eucosmandplugin.databinding.ActivitySettingsBinding
 import com.a42r.eucosmandplugin.range.database.WheelDatabase
@@ -55,6 +58,8 @@ class RangeSettingsActivity : AppCompatActivity() {
     
     class RangeSettingsFragment : PreferenceFragmentCompat(), WheelModelSelectorDialog.WheelSelectionListener {
         
+        private lateinit var tokenManager: TokenManager
+        
         private val eucDataReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 intent?.extras?.let { bundle ->
@@ -65,6 +70,9 @@ class RangeSettingsActivity : AppCompatActivity() {
         }
         
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+            // Initialize TokenManager
+            tokenManager = TokenManager(requireContext())
+            
             // Migrate Int preferences to String for EditTextPreference compatibility
             migrateIntPreferencesToString()
             
@@ -107,6 +115,9 @@ class RangeSettingsActivity : AppCompatActivity() {
             
             // Update detected wheel info
             updateDetectedWheelInfo()
+            
+            // AI Settings
+            setupAIPreferences()
         }
         
         override fun onResume() {
@@ -121,6 +132,9 @@ class RangeSettingsActivity : AppCompatActivity() {
             findPreference<Preference>("battery_optimization_warning")?.let { pref ->
                 updateBatteryOptimizationStatus(pref)
             }
+            
+            // Update AI status
+            updateAIStatus()
         }
         
         override fun onPause() {
@@ -336,6 +350,139 @@ class RangeSettingsActivity : AppCompatActivity() {
                     Toast.LENGTH_SHORT
                 ).show()
             }
+        }
+        
+        /**
+         * Setup AI preferences
+         */
+        private fun setupAIPreferences() {
+            // AI Enabled switch
+            findPreference<SwitchPreferenceCompat>("ai_enabled")?.apply {
+                // Sync with TokenManager
+                isChecked = tokenManager.isAiEnabled()
+                
+                setOnPreferenceChangeListener { _, newValue ->
+                    val enabled = newValue as Boolean
+                    
+                    if (enabled && !tokenManager.isAiConfigured()) {
+                        // Show setup dialog
+                        showAISetupDialog()
+                        false // Don't change the switch yet
+                    } else {
+                        // Save to TokenManager
+                        tokenManager.setAiEnabled(enabled)
+                        updateAIStatus()
+                        true
+                    }
+                }
+            }
+            
+            // AI Status preference
+            findPreference<Preference>("ai_status")?.apply {
+                setOnPreferenceClickListener {
+                    if (!tokenManager.isAiConfigured()) {
+                        showAISetupDialog()
+                    } else {
+                        showAIStatusDialog()
+                    }
+                    true
+                }
+            }
+            
+            // AI Configure preference
+            findPreference<Preference>("ai_configure")?.apply {
+                setOnPreferenceClickListener {
+                    openAIConfiguration()
+                    true
+                }
+            }
+            
+            // Initial status update
+            updateAIStatus()
+        }
+        
+        /**
+         * Update AI status display
+         */
+        private fun updateAIStatus() {
+            val aiStatusPref = findPreference<Preference>("ai_status")
+            val isConfigured = tokenManager.isAiConfigured()
+            val isEnabled = tokenManager.isAiEnabled()
+            
+            aiStatusPref?.apply {
+                when {
+                    !isConfigured -> {
+                        title = getString(R.string.settings_ai_status)
+                        summary = getString(R.string.settings_ai_status_not_configured)
+                    }
+                    isEnabled -> {
+                        title = "✓ " + getString(R.string.settings_ai_status)
+                        summary = getString(R.string.settings_ai_status_configured)
+                    }
+                    else -> {
+                        title = getString(R.string.settings_ai_status)
+                        summary = getString(R.string.settings_ai_status_configured_disabled)
+                    }
+                }
+            }
+            
+            // Update configure preference summary
+            findPreference<Preference>("ai_configure")?.apply {
+                val model = tokenManager.getSelectedAiModel()
+                summary = if (model != null) {
+                    "Model: $model"
+                } else {
+                    getString(R.string.settings_ai_configure_summary)
+                }
+            }
+        }
+        
+        /**
+         * Show dialog explaining AI setup
+         */
+        private fun showAISetupDialog() {
+            AlertDialog.Builder(requireContext())
+                .setTitle(R.string.ai_setup_required_title)
+                .setMessage(R.string.ai_setup_required_message)
+                .setPositiveButton(R.string.ai_setup_button) { _, _ ->
+                    openAIConfiguration()
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
+        
+        /**
+         * Show AI status information dialog
+         */
+        private fun showAIStatusDialog() {
+            val model = tokenManager.getSelectedAiModel() ?: "None"
+            val hasKey = tokenManager.hasOpenRouterApiKey()
+            val isEnabled = tokenManager.isAiEnabled()
+            
+            val message = buildString {
+                appendLine("AI Configuration Status:")
+                appendLine()
+                appendLine("Enabled: ${if (isEnabled) "Yes" else "No"}")
+                appendLine("API Key: ${if (hasKey) "Configured" else "Not configured"}")
+                appendLine("Model: $model")
+            }
+            
+            AlertDialog.Builder(requireContext())
+                .setTitle("AI Status")
+                .setMessage(message)
+                .setPositiveButton("OK", null)
+                .setNeutralButton("Reconfigure") { _, _ ->
+                    openAIConfiguration()
+                }
+                .show()
+        }
+        
+        /**
+         * Open AI configuration activity (OAuth flow)
+         */
+        private fun openAIConfiguration() {
+            val intent = Intent(requireContext(), OAuthActivity::class.java)
+            startActivity(intent)
         }
     }
 }

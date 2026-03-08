@@ -141,6 +141,22 @@
     <string name="range_reset_confirmation_message">This will clear all range calculation data and start a new estimation. This action cannot be undone.</string>
     <string name="range_reset_button">Reset</string>
     
+    <!-- AI Enhancement Settings -->
+    <string name="settings_category_ai_enhancement">AI Enhancement (Beta)</string>
+    <string name="settings_ai_enabled">Enable AI Range Enhancement</string>
+    <string name="settings_ai_enabled_summary">Use AI to improve range estimates based on your riding patterns</string>
+    <string name="settings_ai_configure">Configure AI Provider</string>
+    <string name="settings_ai_configure_summary">Set up OpenRouter API key and select AI model</string>
+    <string name="settings_ai_status">AI Status</string>
+    <string name="settings_ai_status_not_configured">Not configured - tap to set up</string>
+    <string name="settings_ai_status_configured">Configured and ready</string>
+    <string name="settings_ai_status_configured_disabled">Configured but disabled</string>
+    <string name="settings_ai_model">AI Model</string>
+    <string name="settings_ai_model_not_selected">No model selected</string>
+    <string name="ai_setup_required_title">AI Setup Required</string>
+    <string name="ai_setup_required_message">To use AI-enhanced range estimation, you need to configure an OpenRouter API key. This will open a browser to authenticate with OpenRouter.</string>
+    <string name="ai_setup_button">Set Up AI</string>
+    
     <!-- Widget -->
     <string name="widget_name">EUC Battery Status</string>
     <string name="widget_description">Shows EUC battery percentage and voltage</string>

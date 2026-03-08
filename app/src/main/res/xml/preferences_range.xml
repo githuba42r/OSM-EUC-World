@@ -93,4 +93,33 @@
         android:dependency="range_estimation_enabled"
         app:iconSpaceReserved="false" />
 
+    <!-- AI Enhancement Section -->
+    <PreferenceCategory
+        android:key="category_ai_enhancement"
+        android:title="@string/settings_category_ai_enhancement"
+        android:dependency="range_estimation_enabled"
+        app:iconSpaceReserved="false">
+        
+        <SwitchPreferenceCompat
+            android:key="ai_enabled"
+            android:title="@string/settings_ai_enabled"
+            android:summary="@string/settings_ai_enabled_summary"
+            android:defaultValue="false"
+            app:iconSpaceReserved="false" />
+        
+        <Preference
+            android:key="ai_status"
+            android:title="@string/settings_ai_status"
+            android:summary="@string/settings_ai_status_not_configured"
+            android:persistent="false"
+            app:iconSpaceReserved="false" />
+        
+        <Preference
+            android:key="ai_configure"
+            android:title="@string/settings_ai_configure"
+            android:summary="@string/settings_ai_configure_summary"
+            app:iconSpaceReserved="false" />
+        
+    </PreferenceCategory>
+
 </PreferenceScreen>

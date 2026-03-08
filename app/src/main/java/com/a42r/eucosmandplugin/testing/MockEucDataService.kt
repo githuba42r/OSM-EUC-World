@@ -353,22 +353,34 @@ class MockEucDataService : LifecycleService(), MockLocationProvider.LocationCall
     
     /**
      * Get current range estimate (for UI).
+     * If AI is available, returns AI estimate, otherwise baseline
      */
     fun getCurrentRangeEstimate(): Double? {
-        return rangeEstimationManager?.rangeEstimate?.value?.rangeKm
+        val aiEstimate = rangeEstimationManager?.rangeEstimate?.value
+        return if (aiEstimate?.useAI == true && aiEstimate.aiEnhancedEstimate != null) {
+            aiEstimate.aiEnhancedEstimate.rangeKm
+        } else {
+            aiEstimate?.baselineEstimate?.rangeKm
+        }
     }
     
     /**
      * Get range estimation confidence (for UI).
+     * If AI is available, returns AI confidence, otherwise baseline confidence
      */
     fun getRangeEstimationConfidence(): Double {
-        return rangeEstimationManager?.rangeEstimate?.value?.confidence ?: 0.0
+        val aiEstimate = rangeEstimationManager?.rangeEstimate?.value
+        return if (aiEstimate?.useAI == true && aiEstimate.aiEnhancedEstimate != null) {
+            aiEstimate.aiEnhancedEstimate.confidence
+        } else {
+            aiEstimate?.baselineEstimate?.confidence ?: 0.0
+        }
     }
     
     /**
-     * Get full range estimate with all details.
+     * Get the full RangeEstimate for detailed display
      */
-    fun getFullRangeEstimate(): RangeEstimate? {
+    fun getFullRangeEstimate(): com.a42r.eucosmandplugin.ai.model.AIRangeEstimate? {
         return rangeEstimationManager?.rangeEstimate?.value
     }
     

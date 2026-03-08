@@ -8,6 +8,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import com.a42r.eucosmandplugin.ai.data.TokenManager
+import com.a42r.eucosmandplugin.ai.model.AIRangeEstimate
+import com.a42r.eucosmandplugin.ai.service.RangeEstimationAIService
+import com.a42r.eucosmandplugin.ai.service.RiderProfileBuilder
 import com.a42r.eucosmandplugin.api.EucData
 import com.a42r.eucosmandplugin.range.algorithm.*
 import com.a42r.eucosmandplugin.range.database.WheelDatabase
@@ -133,9 +137,13 @@ class RangeEstimationManager(
     private lateinit var simpleLinearEstimator: SimpleLinearEstimator
     private lateinit var weightedWindowEstimator: WeightedWindowEstimator
     
-    // Output: Range estimate StateFlow
-    private val _rangeEstimate = MutableStateFlow<RangeEstimate?>(null)
-    val rangeEstimate: StateFlow<RangeEstimate?> = _rangeEstimate.asStateFlow()
+    // AI service for enhanced estimates
+    private lateinit var rangeEstimationAIService: RangeEstimationAIService
+    private lateinit var tokenManager: TokenManager
+    
+    // Output: Range estimate StateFlow (now returns AIRangeEstimate)
+    private val _rangeEstimate = MutableStateFlow<AIRangeEstimate?>(null)
+    val rangeEstimate: StateFlow<AIRangeEstimate?> = _rangeEstimate.asStateFlow()
     
     // Collection job
     private var collectionJob: Job? = null
@@ -153,6 +161,10 @@ class RangeEstimationManager(
         
         // Initialize data capture logger
         dataCaptureLogger = DataCaptureLogger(context)
+        
+        // Initialize AI service and token manager
+        rangeEstimationAIService = RangeEstimationAIService(context)
+        tokenManager = TokenManager(context)
         
         // Initialize estimators with current settings
         initializeEstimators()
@@ -188,9 +200,14 @@ class RangeEstimationManager(
      * Reset trip (manual reset from user).
      * Creates new trip with fresh baseline.
      * Also triggers a new log capture if logging is enabled AND wheel is connected.
+     * 
+     * BEFORE resetting, processes completed trip for AI rider profile learning.
      */
     fun resetTrip() {
         Log.d(TAG, "Manual trip reset")
+        
+        // Process completed trip for rider profile (AI learning)
+        processCompletedTripForProfile()
         
         // Close current log and start new one (if logging enabled AND wheel is connected)
         if (dataCaptureLogger.isLoggingEnabled()) {
@@ -242,6 +259,17 @@ class RangeEstimationManager(
      */
     private fun isEnabled(): Boolean {
         return prefs.getBoolean(PREF_RANGE_ENABLED, true)
+    }
+    
+    /**
+     * Get battery capacity from settings (for AI profile builder)
+     */
+    private fun getBatteryCapacity(): Double {
+        return try {
+            prefs.getInt(PREF_BATTERY_CAPACITY_WH, -1).takeIf { it != -1 }?.toDouble()
+        } catch (e: ClassCastException) {
+            prefs.getString(PREF_BATTERY_CAPACITY_WH, null)?.toDoubleOrNull()
+        } ?: DEFAULT_BATTERY_CAPACITY
     }
     
     /**
@@ -305,9 +333,11 @@ class RangeEstimationManager(
         Log.d(TAG, "Sampling parameters updated: minTime=${minTimeMinutes}min, minDist=${minDistanceKm}km")
         
         // Re-run estimation immediately with new parameters
-        val estimate = runEstimation()
-        if (estimate != null) {
-            _rangeEstimate.value = estimate
+        scope.launch {
+            val estimate = runEstimation()
+            if (estimate != null) {
+                _rangeEstimate.value = estimate
+            }
         }
     }
     
@@ -354,8 +384,10 @@ class RangeEstimationManager(
             if (disconnectionStartTimestamp != null && 
                 currentTimestamp - disconnectionStartTimestamp!! > 60000L) { // 1 minute
                 val currentEstimate = _rangeEstimate.value
-                if (currentEstimate != null && currentEstimate.status != EstimateStatus.STALE) {
-                    _rangeEstimate.value = currentEstimate.copy(status = EstimateStatus.STALE)
+                if (currentEstimate?.baselineEstimate != null && 
+                    currentEstimate.baselineEstimate.status != EstimateStatus.STALE) {
+                    val staleBaseline = currentEstimate.baselineEstimate.copy(status = EstimateStatus.STALE)
+                    _rangeEstimate.value = currentEstimate.copy(baselineEstimate = staleBaseline)
                 }
             }
             return
@@ -431,64 +463,82 @@ class RangeEstimationManager(
         if (shouldRunEstimation) {
             // Get the algorithm name for logging
             val algorithm = prefs.getString(PREF_ALGORITHM, DEFAULT_ALGORITHM) ?: DEFAULT_ALGORITHM
-            val previousStatus = _rangeEstimate.value?.status
+            val previousStatus = _rangeEstimate.value?.baselineEstimate?.status
             
-            // Run estimation algorithm
-            val estimate = runEstimation()
-            
-            // Log estimate to data capture with detailed reasoning (if enabled)
-            if (estimate != null) {
-                // Log detailed estimate with calculation reasoning
-                val diagnostics = estimate.diagnostics
-                if (diagnostics != null) {
-                    val reasoningMap = mapOf(
-                        "statusReason" to diagnostics.statusReason,
-                        "windowSampleCount" to diagnostics.windowSampleCount,
-                        "windowMinutes" to diagnostics.windowMinutes,
-                        "efficiencyStdDev" to diagnostics.efficiencyStdDev,
-                        "compensatedVoltage" to diagnostics.compensatedVoltage,
-                        "remainingEnergyWh" to diagnostics.remainingEnergyWh,
-                        "currentEnergyPercent" to diagnostics.currentEnergyPercent,
-                        "baseRangeKm" to diagnostics.baseRangeKm,
-                        "calibrationFactor" to diagnostics.calibrationFactor,
-                        "usedHistoricalCalibration" to diagnostics.usedHistoricalCalibration,
-                        "currentSpeedKmh" to diagnostics.currentSpeedKmh,
-                        "minTimeMinutes" to diagnostics.minTimeMinutes,
-                        "minDistanceKm" to diagnostics.minDistanceKm,
-                        "hasEverMetRequirements" to diagnostics.hasEverMetRequirements,
-                        "notes" to diagnostics.notes
-                    )
-                    dataCaptureLogger.logEstimateWithReasoning(estimate, algorithm, reasoningMap)
-                } else {
-                    // Fallback to simple logging if no diagnostics
-                    dataCaptureLogger.logEstimate(estimate)
+            // Run estimation algorithm asynchronously (AI call requires suspend)
+            scope.launch {
+                val estimate = runEstimation()
+                
+                // Log estimate to data capture with detailed reasoning (if enabled)
+                if (estimate != null) {
+                    val baselineEstimate = estimate.baselineEstimate
+                    
+                    // Log detailed estimate with calculation reasoning
+                    if (baselineEstimate != null) {
+                        val diagnostics = baselineEstimate.diagnostics
+                        if (diagnostics != null) {
+                            val reasoningMap = mutableMapOf<String, Any?>(
+                                "statusReason" to diagnostics.statusReason,
+                                "windowSampleCount" to diagnostics.windowSampleCount,
+                                "windowMinutes" to diagnostics.windowMinutes,
+                                "efficiencyStdDev" to diagnostics.efficiencyStdDev,
+                                "compensatedVoltage" to diagnostics.compensatedVoltage,
+                                "remainingEnergyWh" to diagnostics.remainingEnergyWh,
+                                "currentEnergyPercent" to diagnostics.currentEnergyPercent,
+                                "baseRangeKm" to diagnostics.baseRangeKm,
+                                "calibrationFactor" to diagnostics.calibrationFactor,
+                                "usedHistoricalCalibration" to diagnostics.usedHistoricalCalibration,
+                                "currentSpeedKmh" to diagnostics.currentSpeedKmh,
+                                "minTimeMinutes" to diagnostics.minTimeMinutes,
+                                "minDistanceKm" to diagnostics.minDistanceKm,
+                                "hasEverMetRequirements" to diagnostics.hasEverMetRequirements,
+                                "notes" to diagnostics.notes
+                            )
+                            
+                            // Add AI info to reasoning if available
+                            if (estimate.useAI && estimate.aiEnhancedEstimate != null) {
+                                reasoningMap["aiRangeKm"] = estimate.aiEnhancedEstimate.rangeKm
+                                reasoningMap["aiConfidence"] = estimate.aiEnhancedEstimate.confidence
+                                reasoningMap["aiReasoning"] = estimate.aiEnhancedEstimate.reasoning
+                                reasoningMap["aiAssumptions"] = estimate.aiEnhancedEstimate.assumptions
+                                reasoningMap["aiRiskFactors"] = estimate.aiEnhancedEstimate.riskFactors
+                            } else {
+                                reasoningMap["aiReason"] = estimate.reason
+                            }
+                            
+                            dataCaptureLogger.logEstimateWithReasoning(baselineEstimate, algorithm, reasoningMap)
+                        } else {
+                            // Fallback to simple logging if no diagnostics
+                            dataCaptureLogger.logEstimate(baselineEstimate)
+                        }
+                        
+                        // Log status transition if status changed
+                        if (previousStatus != null && previousStatus != baselineEstimate.status) {
+                            val transitionReason = baselineEstimate.diagnostics?.statusReason ?: "Status changed"
+                            val transitionDetails = mapOf(
+                                "previousStatus" to previousStatus.name,
+                                "newStatus" to baselineEstimate.status.name,
+                                "rangeKm" to baselineEstimate.rangeKm,
+                                "confidence" to baselineEstimate.confidence,
+                                "efficiencyWhPerKm" to baselineEstimate.efficiencyWhPerKm,
+                                "travelTimeMinutes" to baselineEstimate.dataQuality.travelTimeMinutes,
+                                "travelDistanceKm" to baselineEstimate.dataQuality.travelDistanceKm,
+                                "meetsMinimumTime" to baselineEstimate.dataQuality.meetsMinimumTime,
+                                "meetsMinimumDistance" to baselineEstimate.dataQuality.meetsMinimumDistance
+                            )
+                            dataCaptureLogger.logStatusTransition(
+                                fromStatus = previousStatus.name,
+                                toStatus = baselineEstimate.status.name,
+                                reason = transitionReason,
+                                details = transitionDetails
+                            )
+                        }
+                    }
                 }
                 
-                // Log status transition if status changed
-                if (previousStatus != null && previousStatus != estimate.status) {
-                    val transitionReason = estimate.diagnostics?.statusReason ?: "Status changed"
-                    val transitionDetails = mapOf(
-                        "previousStatus" to previousStatus.name,
-                        "newStatus" to estimate.status.name,
-                        "rangeKm" to estimate.rangeKm,
-                        "confidence" to estimate.confidence,
-                        "efficiencyWhPerKm" to estimate.efficiencyWhPerKm,
-                        "travelTimeMinutes" to estimate.dataQuality.travelTimeMinutes,
-                        "travelDistanceKm" to estimate.dataQuality.travelDistanceKm,
-                        "meetsMinimumTime" to estimate.dataQuality.meetsMinimumTime,
-                        "meetsMinimumDistance" to estimate.dataQuality.meetsMinimumDistance
-                    )
-                    dataCaptureLogger.logStatusTransition(
-                        fromStatus = previousStatus.name,
-                        toStatus = estimate.status.name,
-                        reason = transitionReason,
-                        details = transitionDetails
-                    )
-                }
+                // Emit estimate
+                _rangeEstimate.value = estimate
             }
-            
-            // Emit estimate
-            _rangeEstimate.value = estimate
             
             // Update last estimation timestamp
             lastEstimationTimestamp = currentTimestamp
@@ -518,7 +568,8 @@ class RangeEstimationManager(
         
         // Check if we have an estimate yet - if not, run frequently to provide progress updates
         val currentEstimate = _rangeEstimate.value
-        if (currentEstimate == null || currentEstimate.status == EstimateStatus.INSUFFICIENT_DATA) {
+        if (currentEstimate == null || 
+            currentEstimate.baselineEstimate?.status == EstimateStatus.INSUFFICIENT_DATA) {
             // Run every 10 seconds while collecting initial data to show progress
             val timeSinceLastEstimation = currentTimestamp - lastEstimationTimestamp
             return timeSinceLastEstimation >= 10000L
@@ -853,9 +904,17 @@ class RangeEstimationManager(
     }
     
     /**
-     * Run estimation algorithm and return RangeEstimate.
+     * Run estimation algorithm and return AIRangeEstimate.
+     * 
+     * This method:
+     * 1. Runs baseline algorithm (SimpleLinear or WeightedWindow)
+     * 2. Optionally enhances with AI if:
+     *    - AI is enabled and configured
+     *    - Not currently charging
+     *    - Rider profile exists with sufficient quality
+     * 3. Returns AIRangeEstimate with both baseline and AI estimates
      */
-    private fun runEstimation(): RangeEstimate? {
+    private suspend fun runEstimation(): AIRangeEstimate? {
         val algorithm = prefs.getString(PREF_ALGORITHM, DEFAULT_ALGORITHM) ?: DEFAULT_ALGORITHM
         
         val estimator = when (algorithm) {
@@ -864,7 +923,47 @@ class RangeEstimationManager(
             else -> weightedWindowEstimator  // Default to weighted window
         }
         
-        return estimator.estimate(tripSnapshot)
+        // Get baseline estimate
+        val baselineEstimate = estimator.estimate(tripSnapshot) ?: return null
+        
+        // Check if we should use AI enhancement
+        val shouldUseAI = prefs.getBoolean("ai_range_estimation_enabled", false) &&
+                          tokenManager.isAiReady() &&
+                          !tripSnapshot.isCurrentlyCharging &&
+                          baselineEstimate.rangeKm != null &&
+                          lastDetectedWheelModel != null
+        
+        if (!shouldUseAI) {
+            // Return baseline only
+            return AIRangeEstimate(
+                baselineEstimate = baselineEstimate,
+                aiEnhancedEstimate = null,
+                useAI = false,
+                reason = when {
+                    !prefs.getBoolean("ai_range_estimation_enabled", false) -> "AI disabled in settings"
+                    !tokenManager.isAiReady() -> "AI not configured"
+                    tripSnapshot.isCurrentlyCharging -> "Currently charging"
+                    baselineEstimate.rangeKm == null -> "Insufficient data for baseline"
+                    lastDetectedWheelModel == null -> "Wheel model unknown"
+                    else -> "AI not available"
+                }
+            )
+        }
+        
+        // Enhance with AI (suspend call, runs on IO dispatcher)
+        val aiResult = rangeEstimationAIService.enhanceRangeEstimate(
+            trip = tripSnapshot,
+            baselineEstimate = baselineEstimate,
+            wheelModel = lastDetectedWheelModel,
+            batteryCapacityWh = getBatteryCapacity()
+        )
+        
+        return aiResult.getOrNull() ?: AIRangeEstimate(
+            baselineEstimate = baselineEstimate,
+            aiEnhancedEstimate = null,
+            useAI = false,
+            reason = "AI enhancement failed: ${aiResult.exceptionOrNull()?.message}"
+        )
     }
     
     /**
@@ -1089,6 +1188,52 @@ class RangeEstimationManager(
             Log.e(TAG, "Failed to restore state: ${e.message}")
             lastSample = null
             previousCompensatedVoltage = null
+        }
+    }
+    
+    /**
+     * Process completed trip for AI rider profile learning.
+     * Called before trip reset to extract patterns and update rider profile.
+     */
+    private fun processCompletedTripForProfile() {
+        // Only process if trip has meaningful data
+        if (tripSnapshot.samples.size < 100) {
+            Log.d(TAG, "Trip too short for profile learning (${tripSnapshot.samples.size} samples)")
+            return
+        }
+        
+        val distanceKm = tripSnapshot.totalDistanceKm
+        if (distanceKm < 1.0) {
+            Log.d(TAG, "Trip distance too short for profile learning (${String.format("%.2f", distanceKm)} km)")
+            return
+        }
+        
+        // Get wheel model
+        val wheelModel = lastDetectedWheelModel
+        if (wheelModel.isNullOrBlank()) {
+            Log.d(TAG, "No wheel model detected - skipping profile update")
+            return
+        }
+        
+        // Get battery capacity from settings
+        val batteryCapacityWh = getBatteryCapacity()
+        
+        // Process trip asynchronously (don't block trip reset)
+        scope.launch {
+            try {
+                Log.d(TAG, "Processing trip for profile learning: $wheelModel, ${tripSnapshot.samples.size} samples, ${String.format("%.2f", distanceKm)} km")
+                
+                val profileBuilder = RiderProfileBuilder(context)
+                profileBuilder.processTripForProfile(
+                    trip = tripSnapshot,
+                    wheelModel = wheelModel,
+                    batteryCapacityWh = batteryCapacityWh
+                )
+                
+                Log.d(TAG, "Profile update completed successfully")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to process trip for profile: ${e.message}", e)
+            }
         }
     }
 }

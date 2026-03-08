@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/modelCard"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginVertical="4dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?attr/selectableItemBackground"
+    app:cardElevation="2dp"
+    app:cardCornerRadius="8dp"
+    app:strokeWidth="0dp"
+    app:strokeColor="?attr/colorPrimary">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="12dp">
+
+        <!-- Model Name Row with Recommendation Badge -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/modelName"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="GPT-4 Omni"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="#000000" />
+
+            <TextView
+                android:id="@+id/recommendationBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="⭐ Best Value"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:textColor="#FF6B00"
+                android:background="@drawable/recommendation_badge_bg"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:paddingTop="2dp"
+                android:paddingBottom="2dp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/modelProvider"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Provider: OpenAI"
+            android:textSize="12sp"
+            android:paddingTop="4dp"
+            android:textColor="#666666" />
+
+        <TextView
+            android:id="@+id/modelCost"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Cost: $5-15/M tokens"
+            android:textSize="12sp"
+            android:paddingTop="2dp"
+            android:textColor="#666666" />
+
+        <TextView
+            android:id="@+id/modelDetails"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Context: 128K tokens"
+            android:textSize="12sp"
+            android:paddingTop="2dp"
+            android:textColor="#666666" />
+
+        <TextView
+            android:id="@+id/modelParameters"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Parameters: 7B"
+            android:textSize="12sp"
+            android:paddingTop="2dp"
+            android:textColor="#666666" />
+
+        <TextView
+            android:id="@+id/modelLink"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="View on OpenRouter ↗"
+            android:textSize="11sp"
+            android:paddingTop="4dp"
+            android:textColor="@color/colorPrimary"
+            android:clickable="true"
+            android:focusable="true" />
+
+    </LinearLayout>
+
+</com.google.android.material.card.MaterialCardView>

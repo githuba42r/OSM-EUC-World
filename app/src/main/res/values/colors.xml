@@ -32,4 +32,7 @@
     <color name="colorPrimary">#2196F3</color>
     <color name="colorPrimaryDark">#1976D2</color>
     <color name="colorAccent">#03DAC5</color>
+    
+    <!-- Selection colors -->
+    <color name="selection_background">#E3F2FD</color>
 </resources>

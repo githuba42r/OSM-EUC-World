@@ -71,4 +71,15 @@
         <item name="android:textSize">16sp</item>
         <item name="android:textColor">@color/widget_text</item>
     </style>
+    
+    <!-- Theme for OAuthActivity with no action bar (uses custom Toolbar) -->
+    <style name="Theme.OsmAndEUCWorld.NoActionBar" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
+        <item name="android:windowBackground">@color/background_dark</item>
+        <item name="android:statusBarColor">@color/colorPrimaryDark</item>
+        <item name="android:navigationBarColor">@color/background_dark</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
 </resources>
