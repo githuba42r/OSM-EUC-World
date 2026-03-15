@@ -19,12 +19,17 @@ import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.SwitchPreferenceCompat
 import com.a42r.eucosmandplugin.R
+import com.a42r.eucosmandplugin.ai.data.RiderProfileDatabase
 import com.a42r.eucosmandplugin.ai.data.TokenManager
 import com.a42r.eucosmandplugin.ai.ui.OAuthActivity
 import com.a42r.eucosmandplugin.api.EucData
 import com.a42r.eucosmandplugin.databinding.ActivitySettingsBinding
 import com.a42r.eucosmandplugin.range.database.WheelDatabase
 import com.a42r.eucosmandplugin.service.AutoProxyReceiver
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import androidx.lifecycle.lifecycleScope
 
 /**
  * Settings activity for range estimation configuration.
@@ -135,6 +140,9 @@ class RangeSettingsActivity : AppCompatActivity() {
             
             // Update AI status
             updateAIStatus()
+            
+            // Update AI data quality indicator
+            updateAIDataQuality()
         }
         
         override fun onPause() {
@@ -475,6 +483,51 @@ class RangeSettingsActivity : AppCompatActivity() {
                     openAIConfiguration()
                 }
                 .show()
+        }
+        
+        /**
+         * Load rider profile from DB for the current wheel and update the ai_data_quality preference.
+         * Score formula: (min(trips/20,1) + min(distKm/200,1)) / 2  — threshold 0.3.
+         */
+        private fun updateAIDataQuality() {
+            val pref = findPreference<Preference>("ai_data_quality") ?: return
+            val wheelModel = preferenceManager.sharedPreferences?.getString("selected_wheel_model", null)
+            
+            if (wheelModel == null) {
+                pref.title = getString(R.string.settings_ai_data_quality_title)
+                pref.summary = getString(R.string.settings_ai_data_quality_no_wheel)
+                return
+            }
+            
+            viewLifecycleOwner.lifecycleScope.launch {
+                val profile = withContext(Dispatchers.IO) {
+                    RiderProfileDatabase.getInstance(requireContext())
+                        .riderProfileDao()
+                        .getProfileByWheelModel(wheelModel)
+                }
+                
+                if (profile == null) {
+                    pref.title = getString(R.string.settings_ai_data_quality_title)
+                    pref.summary = getString(R.string.settings_ai_data_quality_no_data)
+                    return@launch
+                }
+                
+                val tripScore = (profile.totalTrips / 20.0).coerceAtMost(1.0)
+                val distScore = (profile.totalDistanceKm / 200.0).coerceAtMost(1.0)
+                val score = (tripScore + distScore) / 2.0
+                val meetsThreshold = score >= 0.3
+                
+                val tripProgress = "${profile.totalTrips}/20 trips"
+                val distProgress = "${profile.totalDistanceKm.toInt()}/200 km"
+                val scoreText = "Score: %.2f / 1.0".format(score)
+                val statusText = if (meetsThreshold)
+                    getString(R.string.settings_ai_data_quality_ready)
+                else
+                    getString(R.string.settings_ai_data_quality_more_needed)
+                
+                pref.title = getString(R.string.settings_ai_data_quality_title)
+                pref.summary = "$statusText\n$tripProgress  |  $distProgress\n$scoreText"
+            }
         }
         
         /**

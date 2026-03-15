@@ -119,7 +119,16 @@
             android:title="@string/settings_ai_configure"
             android:summary="@string/settings_ai_configure_summary"
             app:iconSpaceReserved="false" />
-        
+
+        <!-- AI data quality / readiness indicator (read-only, populated at runtime) -->
+        <Preference
+            android:key="ai_data_quality"
+            android:title="@string/settings_ai_data_quality_title"
+            android:summary="@string/settings_ai_data_quality_loading"
+            android:enabled="false"
+            android:persistent="false"
+            app:iconSpaceReserved="false" />
+
     </PreferenceCategory>
 
 </PreferenceScreen>
