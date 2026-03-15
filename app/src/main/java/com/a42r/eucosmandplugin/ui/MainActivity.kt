@@ -596,12 +596,21 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             
-            else -> {
-                // COLLECTING, STALE, or unknown status
-                binding.tvRangeEstimate.text = "-- km"
-                binding.tvRangeEstimate.setTextColor(getColor(R.color.text_disabled))
-                binding.tvRangeConfidence.text = getString(R.string.range_collecting_data)
+            com.a42r.eucosmandplugin.range.model.EstimateStatus.STALE -> {
+                // Wheel disconnected but we still have a last known estimate - show it
+                if (displayRangeKm != null) {
+                    val useMetric = prefs.getBoolean("use_metric", true)
+                    val rangeValue = if (useMetric) displayRangeKm else displayRangeKm * 0.621371
+                    val unit = if (useMetric) "km" else "mi"
+                    binding.tvRangeEstimate.text = String.format("%.1f %s", rangeValue, unit)
+                    binding.tvRangeEstimate.setTextColor(getColor(R.color.text_secondary))
+                } else {
+                    binding.tvRangeEstimate.text = "-- km"
+                    binding.tvRangeEstimate.setTextColor(getColor(R.color.text_disabled))
+                }
+                binding.tvRangeConfidence.text = getString(R.string.range_wheel_disconnected)
             }
+
         }
     }
     

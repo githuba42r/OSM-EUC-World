@@ -137,6 +137,7 @@
     <string name="range_confidence_medium">Medium confidence</string>
     <string name="range_confidence_high">High confidence</string>
     <string name="range_charging">Charging</string>
+    <string name="range_wheel_disconnected">Wheel disconnected</string>
     <string name="range_reset_confirmation_title">Reset Range Estimation?</string>
     <string name="range_reset_confirmation_message">This will clear all range calculation data and start a new estimation. This action cannot be undone.</string>
     <string name="range_reset_button">Reset</string>
