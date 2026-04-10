@@ -178,6 +178,7 @@
     <string name="settings_practical_range_loading">Loading…</string>
     <string name="settings_practical_range_no_data">Not enough data yet — need trips that used at least 15%% battery</string>
     <string name="settings_practical_range_format">~%1$d km full charge · %2$.2f km per 1%%\nBased on actual trip endings, not theoretical maximum</string>
+    <string name="settings_trip_elevation_format">↑ %1$d m / ↓ %2$d m · avg %3$.1f km/h</string>
 
     <string name="data_quality_excellent">Excellent</string>
     <string name="data_quality_good">Good</string>
@@ -197,6 +198,13 @@
     <string name="dev_rebuild_profile_in_progress">Rebuilding rider profile…</string>
     <string name="dev_rebuild_profile_result">Processed %1$d of %2$d logs — %3$d samples, %4$.1f km</string>
     <string name="dev_reset_rider_profile_done">Rider profile cleared</string>
+
+    <!-- Dev: Wipe all trip data (DB + trip log files) -->
+    <string name="dev_wipe_all_data_title">Wipe All Trip Data</string>
+    <string name="dev_wipe_all_data_summary">Delete all rider profile data AND all on-disk trip log files. Use this when switching to a new schema version.</string>
+    <string name="dev_wipe_all_data_confirm_title">Wipe ALL trip data?</string>
+    <string name="dev_wipe_all_data_confirm_message">This will permanently delete:\n\n• %1$d trip log files on disk\n• All stored rider profiles\n• All speed/terrain/behavior patterns\n\nThis cannot be undone. Continue?</string>
+    <string name="dev_wipe_all_data_done">Wiped %1$d trip logs and reset rider profile</string>
     <string name="settings_ai_data_quality_ready">✓ Sufficient data — AI can use your riding history</string>
     <string name="settings_ai_data_quality_more_needed">More data needed to unlock AI estimation</string>
     

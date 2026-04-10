@@ -79,6 +79,7 @@ class DeveloperSettingsActivity : AppCompatActivity() {
             setupViewLogsButton()
             setupRebuildProfileButton()
             setupResetProfileButton()
+            setupWipeAllTripDataButton()
         }
         
         private fun setupDeveloperModeToggle() {
@@ -137,6 +138,69 @@ class DeveloperSettingsActivity : AppCompatActivity() {
                     true
                 }
             }
+        }
+
+        /**
+         * Hard wipe: rider profile DB + all trip_*.jsonl files on disk.
+         * Intended for clean breaks when the log schema changes (e.g. v2 → v3
+         * adds altitude data that older logs don't carry).
+         */
+        private fun setupWipeAllTripDataButton() {
+            findPreference<Preference>("wipe_all_trip_data")?.apply {
+                setOnPreferenceClickListener {
+                    confirmAndWipeAllTripData()
+                    true
+                }
+            }
+        }
+
+        private fun confirmAndWipeAllTripData() {
+            val ctx = requireContext()
+            val logDir = logger.getLogDirectoryFile()
+            val logFiles = logDir.listFiles { f -> f.extension == "jsonl" } ?: emptyArray()
+
+            AlertDialog.Builder(ctx)
+                .setTitle(R.string.dev_wipe_all_data_confirm_title)
+                .setMessage(ctx.getString(R.string.dev_wipe_all_data_confirm_message, logFiles.size))
+                .setPositiveButton(android.R.string.ok) { _, _ ->
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        try {
+                            val deleted = withContext(Dispatchers.IO) {
+                                // Close any currently-open log file BEFORE deletion.
+                                if (logger.isCurrentlyLogging()) {
+                                    logger.closeCurrentLog()
+                                }
+
+                                // Wipe Room DB.
+                                RiderProfileBuilder(ctx).resetAllProfiles()
+
+                                // Delete trip log files. Re-list in case the set
+                                // changed since the confirmation dialog opened.
+                                val files = logger.getLogDirectoryFile()
+                                    .listFiles { f -> f.extension == "jsonl" }
+                                    ?: emptyArray()
+                                var count = 0
+                                for (f in files) {
+                                    if (f.delete()) count++
+                                }
+                                count
+                            }
+                            Toast.makeText(
+                                ctx,
+                                ctx.getString(R.string.dev_wipe_all_data_done, deleted),
+                                Toast.LENGTH_LONG
+                            ).show()
+                        } catch (e: Exception) {
+                            Toast.makeText(
+                                ctx,
+                                "Wipe failed: ${e.message}",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
         }
 
         private fun confirmAndResetProfile() {

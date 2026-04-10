@@ -19,10 +19,14 @@ import com.a42r.eucosmandplugin.ai.model.TerrainProfile
         TerrainProfile::class,
         BehaviorPattern::class
     ],
-    // v2: added RiderProfile.practicalKmPerPct. Migration is destructive —
-    // rebuild-from-logs (Developer Settings → Rebuild Profile from Trip Logs)
-    // repopulates the profile on first run.
-    version = 2,
+    // v2: added RiderProfile.practicalKmPerPct.
+    // v3: added RiderProfile.totalAscentMeters / totalDescentMeters, populated
+    //     TerrainProfile for the first time, and switched overallAvgSpeed to a
+    //     time-weighted computation. Migration is destructive — trip logs are
+    //     replayed (Developer Settings → Rebuild Profile from Trip Logs) to
+    //     repopulate the profile, and existing v2 rows are wiped on first
+    //     launch by fallbackToDestructiveMigration().
+    version = 3,
     exportSchema = false
 )
 abstract class RiderProfileDatabase : RoomDatabase() {

@@ -77,6 +77,12 @@
             android:title="@string/dev_reset_rider_profile_title"
             android:summary="@string/dev_reset_rider_profile_summary"
             app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="wipe_all_trip_data"
+            android:title="@string/dev_wipe_all_data_title"
+            android:summary="@string/dev_wipe_all_data_summary"
+            app:iconSpaceReserved="false" />
     </PreferenceCategory>
 
 </PreferenceScreen>

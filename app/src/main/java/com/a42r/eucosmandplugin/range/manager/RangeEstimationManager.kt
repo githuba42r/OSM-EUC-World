@@ -1,8 +1,15 @@
 package com.a42r.eucosmandplugin.range.manager
 
+import android.Manifest
 import android.content.Context
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
+import android.os.Bundle
 import android.util.Log
+import androidx.core.content.ContextCompat
 import androidx.preference.PreferenceManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -160,6 +167,25 @@ class RangeEstimationManager(
     
     // Collection job
     private var collectionJob: Job? = null
+
+    // Android LocationManager fallback for altitude when EucData.altitude is 0.
+    // We register a lightweight listener during start() and cache the most
+    // recent fix. The altitude is only *read* in createSampleFromEucData when
+    // the EUC payload has no altitude of its own, so a stale fix (a few
+    // seconds) is acceptable for trip-long aggregates like ascent/descent.
+    private var locationManager: LocationManager? = null
+    @Volatile private var lastAndroidLocation: Location? = null
+    private val androidLocationListener = object : LocationListener {
+        override fun onLocationChanged(location: Location) {
+            if (location.hasAltitude()) {
+                lastAndroidLocation = location
+            }
+        }
+        override fun onProviderEnabled(provider: String) {}
+        override fun onProviderDisabled(provider: String) {}
+        @Deprecated("Deprecated in API 29")
+        override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+    }
     
     /**
      * Start observing EucData stream and producing range estimates.
@@ -187,6 +213,10 @@ class RangeEstimationManager(
         
         // Stop any existing collection
         stop()
+
+        // Register Android LocationManager fallback for altitude. Silently
+        // skipped if permission isn't granted or no provider is available.
+        startAndroidLocationListener()
 
         // Start collecting EucData and producing estimates
         collectionJob = scope.launch {
@@ -217,6 +247,77 @@ class RangeEstimationManager(
         collectionJob?.cancel()
         collectionJob = null
         _rangeEstimate.value = null
+        stopAndroidLocationListener()
+    }
+
+    /**
+     * Register a lightweight listener on Android's built-in LocationManager so
+     * we have an altitude fallback when EucData.altitude is zero / missing.
+     *
+     * Deliberately uses the framework LocationManager rather than
+     * FusedLocationProviderClient to avoid pulling in play-services-location
+     * as a new dependency. A 1 s minimum update interval is plenty for
+     * tracking altitude across a trip.
+     */
+    private fun startAndroidLocationListener() {
+        val lm = try {
+            context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to obtain LocationManager", e)
+            null
+        } ?: return
+
+        val hasFine = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val hasCoarse = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!hasFine && !hasCoarse) {
+            Log.d(TAG, "Location permission not granted — altitude fallback disabled")
+            return
+        }
+
+        locationManager = lm
+        try {
+            // Seed lastAndroidLocation with whatever last-known fix we already
+            // have, so altitude is available before the first fresh update.
+            val providers = buildList {
+                if (hasFine && lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) add(LocationManager.GPS_PROVIDER)
+                if (lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) add(LocationManager.NETWORK_PROVIDER)
+            }
+            for (p in providers) {
+                @Suppress("MissingPermission")
+                lm.getLastKnownLocation(p)?.takeIf { it.hasAltitude() }?.let { lastAndroidLocation = it }
+            }
+
+            val primary = when {
+                hasFine && lm.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
+                lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
+                else -> null
+            }
+            if (primary != null) {
+                @Suppress("MissingPermission")
+                lm.requestLocationUpdates(primary, 1000L, 0.0f, androidLocationListener)
+                Log.d(TAG, "Android location listener registered on $primary for altitude fallback")
+            } else {
+                Log.d(TAG, "No suitable location provider enabled — altitude fallback unavailable")
+            }
+        } catch (e: SecurityException) {
+            Log.w(TAG, "SecurityException registering location listener", e)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to register location listener", e)
+        }
+    }
+
+    private fun stopAndroidLocationListener() {
+        try {
+            locationManager?.removeUpdates(androidLocationListener)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to remove location listener", e)
+        }
+        locationManager = null
+        lastAndroidLocation = null
     }
     
     /**
@@ -1092,6 +1193,15 @@ class RangeEstimationManager(
             flags.add(SampleFlag.CHARGING_DETECTED)
         }
         
+        // Resolve altitude: prefer EUC-reported, fall back to Android location,
+        // else NaN (unavailable). EUC World reports 0.0 when the field isn't
+        // populated, so treat exactly zero as "missing".
+        val altitude: Double = when {
+            eucData.altitude != 0.0 -> eucData.altitude
+            lastAndroidLocation?.hasAltitude() == true -> lastAndroidLocation!!.altitude
+            else -> Double.NaN
+        }
+
         return BatterySample(
             timestamp = timestamp,
             voltage = eucData.voltage,
@@ -1105,6 +1215,7 @@ class RangeEstimationManager(
             latitude = eucData.latitude,
             longitude = eucData.longitude,
             gpsSpeedKmh = eucData.gpsSpeed,
+            altitudeMeters = altitude,
             flags = flags
         )
     }

@@ -21,6 +21,13 @@ data class RiderProfile(
     val totalRidingTimeHours: Double,
     val avgTripDistanceKm: Double,
     val overallAvgEfficiency: Double,
+    /**
+     * Time-weighted average speed across all recorded samples (km/h).
+     *
+     * Computed as Σ(speed · Δt) / Σ Δt rather than a plain arithmetic mean,
+     * so that connection gaps and irregular sample spacing don't bias the
+     * aggregate. At clean 500 ms sampling these are effectively identical.
+     */
     val overallAvgSpeed: Double,
     val dataQualityScore: Double,
     val lastRecalculated: Long,
@@ -36,7 +43,20 @@ data class RiderProfile(
      * Zero / negative means not enough data yet — consumers should fall back
      * to the theoretical algorithmic estimate in that case.
      */
-    val practicalKmPerPct: Double = 0.0
+    val practicalKmPerPct: Double = 0.0,
+
+    /**
+     * Total metres of cumulative ascent across all recorded trips for this
+     * wheel. Applied with a 0.5 m deadband when integrated per-trip to filter
+     * GPS altitude noise. Zero for pre-v3 logs (no altitude captured).
+     */
+    val totalAscentMeters: Double = 0.0,
+
+    /**
+     * Total metres of cumulative descent across all recorded trips for this
+     * wheel. See [totalAscentMeters] for deadband behaviour.
+     */
+    val totalDescentMeters: Double = 0.0
 ) {
     // Convenience properties
     val avgEfficiencyWhPerKm: Double get() = overallAvgEfficiency

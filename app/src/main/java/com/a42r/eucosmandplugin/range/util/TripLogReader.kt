@@ -172,6 +172,9 @@ class TripLogReader {
         val latitude = (obj["latitude"] as? Number)?.toDouble() ?: 0.0
         val longitude = (obj["longitude"] as? Number)?.toDouble() ?: 0.0
         val gpsSpeedKmh = (obj["gpsSpeedKmh"] as? Number)?.toDouble() ?: 0.0
+        // v3+ logs carry altitude; older logs don't, in which case we leave it
+        // as NaN so downstream consumers can cleanly detect "no elevation data".
+        val altitudeMeters = (obj["altitudeMeters"] as? Number)?.toDouble() ?: Double.NaN
 
         val flags: Set<SampleFlag> = (obj["flags"] as? List<*>)
             ?.mapNotNull { entry ->
@@ -194,6 +197,7 @@ class TripLogReader {
             latitude = latitude,
             longitude = longitude,
             gpsSpeedKmh = gpsSpeedKmh,
+            altitudeMeters = altitudeMeters,
             flags = flags
         )
     }

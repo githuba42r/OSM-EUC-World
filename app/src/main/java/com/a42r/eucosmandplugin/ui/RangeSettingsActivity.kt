@@ -546,10 +546,23 @@ class RangeSettingsActivity : AppCompatActivity() {
                     return@launch
                 }
 
-                // 1. Trip summary
-                tripSummaryPref.summary =
-                    "${profile.totalTrips} trips · ${profile.totalDistanceKm.toInt()} km total · " +
+                // 1. Trip summary + elevation / time-weighted avg speed (schema v3).
+                //    Elevation line only appears when we actually have data —
+                //    pre-v3 logs have zero ascent/descent and would otherwise
+                //    display a meaningless "↑ 0 m / ↓ 0 m".
+                val base = "${profile.totalTrips} trips · ${profile.totalDistanceKm.toInt()} km total · " +
                     "avg ${profile.avgTripDistanceKm.toInt()} km/trip"
+                val elevationLine = if (profile.totalAscentMeters > 0.0 || profile.totalDescentMeters > 0.0) {
+                    "\n" + getString(
+                        R.string.settings_trip_elevation_format,
+                        profile.totalAscentMeters.toInt(),
+                        profile.totalDescentMeters.toInt(),
+                        profile.overallAvgSpeed
+                    )
+                } else {
+                    ""
+                }
+                tripSummaryPref.summary = base + elevationLine
 
                 // 2. Historical data quality — same score formula as the old
                 //    AI data quality indicator, but labelled more accurately.

@@ -46,7 +46,17 @@ data class BatterySample(
     
     /** GPS speed in km/h (0.0 if not available) */
     val gpsSpeedKmh: Double = 0.0,
-    
+
+    /**
+     * Altitude in metres above sea level. NaN when not available.
+     *
+     * Primary source is EucData.altitude (reported by the EUC World app).
+     * Falls back to Android LocationManager when the EUC payload reports 0.0.
+     * NaN (not 0.0) is used as the "missing" sentinel so that valid sea-level
+     * samples are distinguishable from unavailable altitude.
+     */
+    val altitudeMeters: Double = Double.NaN,
+
     /** Sample quality flags (for anomaly detection) */
     val flags: Set<SampleFlag> = emptySet()
 ) {
@@ -59,6 +69,10 @@ data class BatterySample(
     /** Whether GPS location data is available */
     val hasGpsLocation: Boolean
         get() = latitude != 0.0 && longitude != 0.0
+
+    /** Whether altitude is available for this sample */
+    val hasAltitude: Boolean
+        get() = !altitudeMeters.isNaN()
     
     /** 
      * Voltage sag amount (difference between compensated and raw voltage).

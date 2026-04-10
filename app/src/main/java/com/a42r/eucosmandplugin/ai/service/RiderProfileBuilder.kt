@@ -86,11 +86,18 @@ class RiderProfileBuilder(private val context: Context) {
             // Extract speed profiles from trip
             val newSpeedProfiles = extractSpeedProfiles(profile.profileId, validSamples)
 
+            // Extract terrain profiles (grade-segmented efficiency) from trip.
+            // Populated whenever altitude is available on the samples. Collected
+            // now but not yet consumed by the live range estimator (see
+            // schema-v3 plan — "collect now, use later").
+            val newTerrainProfiles = extractTerrainProfiles(profile.profileId, validSamples)
+
             // Extract behavior patterns
             val newBehaviorPattern = analyzeBehaviorPatterns(profile.profileId, validSamples)
 
             // Merge with existing profile
             mergeSpeedProfiles(profile.profileId, newSpeedProfiles)
+            mergeTerrainProfiles(profile.profileId, newTerrainProfiles)
             mergeBehaviorPattern(profile.profileId, newBehaviorPattern)
 
             // Update profile statistics
@@ -135,7 +142,13 @@ class RiderProfileBuilder(private val context: Context) {
     }
     
     /**
-     * Extract speed profiles from trip samples
+     * Extract speed profiles from trip samples.
+     *
+     * `timePercentage` is now genuinely **time-weighted**: each sample
+     * contributes the Δt since the previous sample (capped at 5 s to drop
+     * connection gaps) rather than a uniform weight of 1. At clean 500 ms
+     * sampling this is identical to the old sample-count ratio, but it
+     * behaves correctly when the log contains gaps.
      */
     private fun extractSpeedProfiles(profileId: String, samples: List<BatterySample>): List<SpeedProfile> {
         // Define speed buckets (km/h ranges)
@@ -150,20 +163,32 @@ class RiderProfileBuilder(private val context: Context) {
             40 to 50
         )
 
-        return speedBuckets.mapNotNull { (min, max) ->
-            val bucketed = samples.filter { it.speedKmh >= min && it.speedKmh < max }
+        // Precompute per-sample Δt (seconds) for time-weighting. The first
+        // sample has no predecessor so we assign it zero weight.
+        val dtSec = DoubleArray(samples.size)
+        for (i in 1 until samples.size) {
+            val dt = (samples[i].timestamp - samples[i - 1].timestamp) / 1000.0
+            dtSec[i] = if (dt in 0.0..5.0) dt else 0.0
+        }
+        val totalDt = dtSec.sum().takeIf { it > 0.0 } ?: 1.0
 
-            if (bucketed.isEmpty()) return@mapNotNull null
+        return speedBuckets.mapNotNull { (min, max) ->
+            val bucketedIdx = samples.indices.filter {
+                samples[it].speedKmh >= min && samples[it].speedKmh < max
+            }
+            if (bucketedIdx.isEmpty()) return@mapNotNull null
+
+            val bucketed = bucketedIdx.map { samples[it] }
+            val bucketDt = bucketedIdx.sumOf { dtSec[it] }
 
             val efficiencies = bucketed.map { it.instantEfficiencyWhPerKm }
                 .filter { !it.isNaN() && !it.isInfinite() }
-
             if (efficiencies.isEmpty()) return@mapNotNull null
 
             val avgEfficiency = efficiencies.average()
             val stdDev = calculateStdDev(efficiencies)
             val totalDistance = bucketed.sumOf { it.distanceSincePreviousSampleKm ?: 0.0 }
-            val timePercentage = bucketed.size.toDouble() / samples.size
+            val timePercentage = bucketDt / totalDt
 
             // Calculate typical duration (how long rider stays in this speed range)
             val typicalDuration = calculateTypicalDuration(bucketed)
@@ -178,6 +203,135 @@ class RiderProfileBuilder(private val context: Context) {
                 totalDistanceKm = totalDistance,
                 timePercentage = timePercentage,
                 typicalDurationSeconds = typicalDuration
+            )
+        }
+    }
+
+    /**
+     * Extract terrain (grade-segmented) efficiency profiles from trip samples.
+     *
+     * Approach: walk the samples in order and emit a "grade window" every
+     * time the cumulative distance since the last window crosses a 20 m
+     * threshold. For each window compute:
+     *   - Δaltitude / Δdistance (as grade %)
+     *   - distance-weighted Wh/km for the samples in the window
+     *
+     * Windows where altitude is NaN or Δdistance < 5 m are dropped
+     * (sub-5 m windows are below the effective GPS altitude resolution).
+     *
+     * Windows are then bucketed into the five `TerrainType` ranges:
+     *   FLAT           |grade| < 2
+     *   GENTLE_UPHILL  2 ≤ grade < 5
+     *   STEEP_UPHILL   grade ≥ 5
+     *   GENTLE_DOWNHILL -5 < grade ≤ -2
+     *   STEEP_DOWNHILL grade ≤ -5
+     *
+     * If the trip has no altitude data at all, an empty list is returned
+     * and no TerrainProfile rows are written.
+     */
+    private fun extractTerrainProfiles(profileId: String, samples: List<BatterySample>): List<TerrainProfile> {
+        // If no sample has altitude, there's nothing to compute.
+        if (samples.none { it.hasAltitude }) return emptyList()
+
+        val WINDOW_MIN_DISTANCE_KM = 0.020  // 20 m grade window
+        val MIN_WINDOW_DISTANCE_KM = 0.005  // 5 m hard floor
+
+        data class Window(
+            val gradePct: Double,
+            val distanceKm: Double,
+            val whPerKm: Double,
+            val speedKmh: Double
+        )
+        val windows = mutableListOf<Window>()
+
+        var windowStart = 0
+        var windowDistanceKm = 0.0
+        for (i in 1 until samples.size) {
+            windowDistanceKm += samples[i].distanceSincePreviousSampleKm ?: 0.0
+
+            if (windowDistanceKm < WINDOW_MIN_DISTANCE_KM) continue
+
+            val a = samples[windowStart]
+            val b = samples[i]
+
+            // Skip windows missing altitude at either endpoint.
+            if (!a.hasAltitude || !b.hasAltitude) {
+                windowStart = i
+                windowDistanceKm = 0.0
+                continue
+            }
+            if (windowDistanceKm < MIN_WINDOW_DISTANCE_KM) {
+                windowStart = i
+                windowDistanceKm = 0.0
+                continue
+            }
+
+            val deltaAltM = b.altitudeMeters - a.altitudeMeters
+            val gradePct = 100.0 * deltaAltM / (windowDistanceKm * 1000.0)
+
+            // Distance-weighted Wh/km across the window:
+            //   Σ(power · dt) / Σ(speed · dt)  (integrated energy / distance)
+            // which is equivalent to energy / distance for the window.
+            var energyWh = 0.0
+            for (k in (windowStart + 1)..i) {
+                val dtH = (samples[k].timestamp - samples[k - 1].timestamp) / 3_600_000.0
+                if (dtH in 0.0..(5.0 / 3600.0)) {
+                    energyWh += samples[k].powerWatts * dtH
+                }
+            }
+            val whPerKm = if (windowDistanceKm > 0.0) energyWh / windowDistanceKm else 0.0
+
+            // Window-average speed (simple mean over the window's samples).
+            val speeds = (windowStart..i).map { samples[it].speedKmh }
+            val avgSpeed = if (speeds.isNotEmpty()) speeds.average() else 0.0
+
+            if (!whPerKm.isNaN() && !whPerKm.isInfinite()) {
+                windows.add(Window(gradePct, windowDistanceKm, whPerKm, avgSpeed))
+            }
+
+            windowStart = i
+            windowDistanceKm = 0.0
+        }
+
+        if (windows.isEmpty()) return emptyList()
+
+        // Bucket windows by terrain type.
+        data class BucketAccum(
+            val terrainType: TerrainType,
+            val gradeMin: Double,
+            val gradeMax: Double,
+            val whPerKm: MutableList<Double> = mutableListOf(),
+            val speeds: MutableList<Double> = mutableListOf(),
+            var totalDistanceKm: Double = 0.0
+        )
+        val buckets = listOf(
+            BucketAccum(TerrainType.STEEP_DOWNHILL,  Double.NEGATIVE_INFINITY, -5.0),
+            BucketAccum(TerrainType.GENTLE_DOWNHILL, -5.0,                     -2.0),
+            BucketAccum(TerrainType.FLAT,            -2.0,                      2.0),
+            BucketAccum(TerrainType.GENTLE_UPHILL,    2.0,                      5.0),
+            BucketAccum(TerrainType.STEEP_UPHILL,     5.0,                      Double.POSITIVE_INFINITY)
+        )
+
+        for (w in windows) {
+            val bucket = buckets.firstOrNull { b ->
+                w.gradePct >= b.gradeMin && w.gradePct < b.gradeMax
+            } ?: buckets.last()  // Treat exact +inf as STEEP_UPHILL
+            bucket.whPerKm.add(w.whPerKm)
+            bucket.speeds.add(w.speedKmh)
+            bucket.totalDistanceKm += w.distanceKm
+        }
+
+        return buckets.mapNotNull { b ->
+            if (b.whPerKm.isEmpty()) return@mapNotNull null
+            TerrainProfile(
+                profileId = profileId,
+                terrainType = b.terrainType.name,
+                gradeMin = b.gradeMin,
+                gradeMax = b.gradeMax,
+                avgEfficiencyWhPerKm = b.whPerKm.average(),
+                stdDeviation = calculateStdDev(b.whPerKm),
+                sampleCount = b.whPerKm.size,
+                avgSpeedKmh = if (b.speeds.isNotEmpty()) b.speeds.average() else 0.0
             )
         }
     }
@@ -300,6 +454,57 @@ class RiderProfileBuilder(private val context: Context) {
     }
     
     /**
+     * Cumulative ascent and descent (metres) across a sample list, with a
+     * 0.5 m deadband. The deadband reference only advances when the delta
+     * to the previous reference exceeds the deadband, so small oscillations
+     * around a plateau (GPS altitude jitter) don't silently accumulate.
+     *
+     * Samples without altitude (`hasAltitude == false`) are skipped entirely.
+     * Returns (0.0, 0.0) for trips with no altitude data.
+     */
+    private fun computeAscentDescent(samples: List<BatterySample>): Pair<Double, Double> {
+        val deadband = 0.5  // metres
+        var ascent = 0.0
+        var descent = 0.0
+        var ref: Double? = null
+        for (s in samples) {
+            if (!s.hasAltitude) continue
+            val a = s.altitudeMeters
+            val prev = ref
+            if (prev == null) {
+                ref = a
+                continue
+            }
+            val delta = a - prev
+            when {
+                delta > deadband  -> { ascent += delta;  ref = a }
+                delta < -deadband -> { descent += -delta; ref = a }
+                // else: within deadband → hold reference
+            }
+        }
+        return ascent to descent
+    }
+
+    /**
+     * Time-weighted average speed Σ(speed·Δt) / Σ Δt over a sample list.
+     * Drops gaps > 5 s to avoid biasing the mean on connection dropouts.
+     * Returns 0.0 for single-sample lists.
+     */
+    private fun computeTimeWeightedAvgSpeed(samples: List<BatterySample>): Double {
+        if (samples.size < 2) return samples.firstOrNull()?.speedKmh ?: 0.0
+        var num = 0.0
+        var den = 0.0
+        for (i in 1 until samples.size) {
+            val dt = (samples[i].timestamp - samples[i - 1].timestamp) / 1000.0
+            if (dt in 0.0..5.0 && samples[i].speedKmh >= 0.0) {
+                num += samples[i].speedKmh * dt
+                den += dt
+            }
+        }
+        return if (den > 0.0) num / den else 0.0
+    }
+
+    /**
      * Calculate standard deviation
      */
     private fun calculateStdDev(values: List<Double>): Double {
@@ -343,6 +548,31 @@ class RiderProfileBuilder(private val context: Context) {
     }
     
     /**
+     * Merge new terrain profiles with existing ones using a sample-count
+     * weighted mean — same approach as [mergeSpeedProfiles].
+     */
+    private suspend fun mergeTerrainProfiles(profileId: String, newProfiles: List<TerrainProfile>) {
+        if (newProfiles.isEmpty()) return
+        for (new in newProfiles) {
+            val existing = database.terrainProfileDao().getTerrainProfile(profileId, new.terrainType)
+            val merged = if (existing != null) {
+                val totalSamples = existing.sampleCount + new.sampleCount
+                val existingWeight = existing.sampleCount.toDouble() / totalSamples
+                val newWeight = new.sampleCount.toDouble() / totalSamples
+                existing.copy(
+                    avgEfficiencyWhPerKm = existing.avgEfficiencyWhPerKm * existingWeight +
+                                          new.avgEfficiencyWhPerKm * newWeight,
+                    avgSpeedKmh = existing.avgSpeedKmh * existingWeight + new.avgSpeedKmh * newWeight,
+                    sampleCount = totalSamples
+                )
+            } else {
+                new
+            }
+            database.terrainProfileDao().insertTerrainProfile(merged)
+        }
+    }
+
+    /**
      * Merge behavior pattern
      */
     private suspend fun mergeBehaviorPattern(profileId: String, newPattern: BehaviorPattern) {
@@ -378,12 +608,22 @@ class RiderProfileBuilder(private val context: Context) {
             .filter { !it.isNaN() && !it.isInfinite() }
         val avgEfficiency = efficiencies.takeIf { it.isNotEmpty() }?.average() ?: 0.0
 
-        val speeds = validSamples.map { it.speedKmh }
-        val avgSpeed = speeds.takeIf { it.isNotEmpty() }?.average() ?: 0.0
+        // Time-weighted average speed: Σ(speed · Δt) / Σ Δt. Connection
+        // gaps (Δt > 5 s) are dropped so a long dropout doesn't deflate
+        // the mean. At clean 500 ms sampling this is identical to an
+        // arithmetic mean over the samples.
+        val avgSpeed = computeTimeWeightedAvgSpeed(validSamples)
+
+        // Cumulative ascent / descent for this trip, with a 0.5 m
+        // deadband to kill GPS altitude jitter. Returns (0, 0) if the
+        // trip has no altitude data.
+        val (tripAscent, tripDescent) = computeAscentDescent(trip.samples)
 
         val newTotalTrips = profile.totalTrips + 1
         val newTotalDistance = profile.totalDistanceKm + trip.totalDistanceKm
         val newTotalTime = profile.totalRidingTimeHours + ridingTimeHours
+        val newTotalAscent = profile.totalAscentMeters + tripAscent
+        val newTotalDescent = profile.totalDescentMeters + tripDescent
 
         // Practical km-per-% from this trip. We use **voltage-derived energy
         // percent** (via LiIonDischargeCurve), NOT the wheel's reported
@@ -454,10 +694,17 @@ class RiderProfileBuilder(private val context: Context) {
             overallAvgSpeed = (profile.overallAvgSpeed * profile.totalTrips + avgSpeed) / newTotalTrips,
             dataQualityScore = calculateDataQuality(newTotalTrips, newTotalDistance),
             lastRecalculated = System.currentTimeMillis(),
-            practicalKmPerPct = newPracticalKmPerPct
+            practicalKmPerPct = newPracticalKmPerPct,
+            totalAscentMeters = newTotalAscent,
+            totalDescentMeters = newTotalDescent
         )
 
         database.riderProfileDao().updateProfile(updated)
+
+        Log.d(TAG, "Trip elevation: ascent=${"%.1f".format(tripAscent)}m " +
+                "descent=${"%.1f".format(tripDescent)}m, avgSpd=${"%.1f".format(avgSpeed)}km/h " +
+                "→ profile totalAscent=${"%.1f".format(newTotalAscent)}m " +
+                "totalDescent=${"%.1f".format(newTotalDescent)}m")
 
         if (tripKmPerEnergyPct != null) {
             Log.d(TAG, "Trip km/energy%: ${String.format("%.3f", tripKmPerEnergyPct)} " +

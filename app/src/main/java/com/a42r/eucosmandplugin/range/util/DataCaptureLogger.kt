@@ -41,6 +41,25 @@ class DataCaptureLogger(private val context: Context) {
     private var currentLogWriter: FileWriter? = null
     private var sampleCount = 0
 
+    // Streaming trip-end aggregates. These are accumulated as samples are
+    // written and flushed into the footer metadata when the log closes. They
+    // are informational — the authoritative values are recomputed during
+    // replay by RiderProfileBuilder — but writing them makes the closed log
+    // self-describing for inspection tools.
+    private var elevationReferenceM: Double = Double.NaN
+    private var totalAscentMeters: Double = 0.0
+    private var totalDescentMeters: Double = 0.0
+    private var speedWeightedTimeSec: Double = 0.0
+    private var totalTimeSec: Double = 0.0
+    private var previousSampleTsMs: Long = 0L
+    private var tripStartTsMs: Long = 0L
+    private var tripEndTsMs: Long = 0L
+
+    /** Deadband in metres for ignoring GPS altitude noise. */
+    private val ELEVATION_DEADBAND_M = 0.5
+    /** Maximum dt (seconds) between samples before the gap is dropped from time-weighted aggregates. */
+    private val MAX_SAMPLE_GAP_SEC = 5.0
+
     // Wheel context for log metadata. Captured via [setWheelContext] when the wheel
     // is detected, and re-emitted as a `wheel_detected` event on the current log so
     // that [TripLogReader] can recover the wheel identity from older logs that
@@ -120,11 +139,20 @@ class DataCaptureLogger(private val context: Context) {
         try {
             currentLogWriter = FileWriter(currentLogFile, true)
             sampleCount = 0
+            // Reset streaming trip-end aggregates for the new log.
+            elevationReferenceM = Double.NaN
+            totalAscentMeters = 0.0
+            totalDescentMeters = 0.0
+            speedWeightedTimeSec = 0.0
+            totalTimeSec = 0.0
+            previousSampleTsMs = 0L
+            tripStartTsMs = 0L
+            tripEndTsMs = 0L
 
             // Write header metadata
             val metadata = mutableMapOf<String, Any?>(
                 "type" to "metadata",
-                "version" to 2,
+                "version" to 3,
                 "startTime" to System.currentTimeMillis(),
                 "startTimestamp" to timestamp,
                 "deviceInfo" to mapOf(
@@ -158,6 +186,8 @@ class DataCaptureLogger(private val context: Context) {
         }
         
         try {
+            val altitudeJson: Double? = if (sample.altitudeMeters.isNaN()) null else sample.altitudeMeters
+
             val sampleData = mapOf(
                 "type" to "sample",
                 "timestamp" to sample.timestamp,
@@ -172,7 +202,9 @@ class DataCaptureLogger(private val context: Context) {
                 "latitude" to sample.latitude,
                 "longitude" to sample.longitude,
                 "gpsSpeedKmh" to sample.gpsSpeedKmh,
+                "altitudeMeters" to altitudeJson,
                 "hasGpsLocation" to sample.hasGpsLocation,
+                "hasAltitude" to sample.hasAltitude,
                 "voltageSag" to sample.voltageSag,
                 "hasSignificantSag" to sample.hasSignificantSag,
                 "instantEfficiencyWhPerKm" to if (sample.instantEfficiencyWhPerKm.isNaN()) null else sample.instantEfficiencyWhPerKm,
@@ -182,6 +214,42 @@ class DataCaptureLogger(private val context: Context) {
 
             writeJsonLine(sampleData)
             sampleCount++
+
+            // ---- Streaming trip-end aggregates ----
+            if (tripStartTsMs == 0L) tripStartTsMs = sample.timestamp
+            tripEndTsMs = sample.timestamp
+
+            // Time-weighted average speed — accumulate Σ(speed·dt) and Σdt,
+            // dropping pathological gaps (connection dropouts).
+            if (previousSampleTsMs != 0L) {
+                val dtSec = (sample.timestamp - previousSampleTsMs) / 1000.0
+                if (dtSec > 0.0 && dtSec <= MAX_SAMPLE_GAP_SEC && sample.speedKmh >= 0.0) {
+                    totalTimeSec += dtSec
+                    speedWeightedTimeSec += sample.speedKmh * dtSec
+                }
+            }
+            previousSampleTsMs = sample.timestamp
+
+            // Ascent / descent with deadband — a climb of < 0.5 m doesn't
+            // count (GPS altitude jitter). The reference only advances when
+            // the delta exceeds the deadband, otherwise small oscillations
+            // around a plateau don't silently accumulate.
+            if (!sample.altitudeMeters.isNaN()) {
+                val cur = sample.altitudeMeters
+                if (elevationReferenceM.isNaN()) {
+                    elevationReferenceM = cur
+                } else {
+                    val delta = cur - elevationReferenceM
+                    if (delta > ELEVATION_DEADBAND_M) {
+                        totalAscentMeters += delta
+                        elevationReferenceM = cur
+                    } else if (delta < -ELEVATION_DEADBAND_M) {
+                        totalDescentMeters += -delta
+                        elevationReferenceM = cur
+                    }
+                    // else: within deadband, hold reference
+                }
+            }
             
             // Flush every 100 samples to ensure data is written
             if (sampleCount % 100 == 0) {
@@ -367,18 +435,32 @@ class DataCaptureLogger(private val context: Context) {
     fun closeCurrentLog() {
         try {
             if (currentLogWriter != null) {
-                // Write footer metadata
+                // Compute trip-end summary from streaming aggregates.
+                val timeWeightedAvgSpeed = if (totalTimeSec > 0.0) {
+                    speedWeightedTimeSec / totalTimeSec
+                } else 0.0
+                val durationSec = if (tripStartTsMs != 0L && tripEndTsMs >= tripStartTsMs) {
+                    (tripEndTsMs - tripStartTsMs) / 1000.0
+                } else 0.0
+
+                // Write footer metadata — informational totals mirrored from the
+                // streaming aggregates. Replay still recomputes these from raw
+                // samples, but writing them makes logs self-describing.
                 val metadata = mapOf(
                     "type" to "metadata",
                     "endTime" to System.currentTimeMillis(),
-                    "totalSamples" to sampleCount
+                    "totalSamples" to sampleCount,
+                    "totalAscentMeters" to totalAscentMeters,
+                    "totalDescentMeters" to totalDescentMeters,
+                    "timeWeightedAvgSpeedKmh" to timeWeightedAvgSpeed,
+                    "durationSeconds" to durationSec
                 )
                 writeJsonLine(metadata)
 
                 currentLogWriter?.flush()
                 currentLogWriter?.close()
 
-                Log.d(TAG, "Closed log with $sampleCount samples: ${currentLogFile?.absolutePath}")
+                Log.d(TAG, "Closed log with $sampleCount samples, ascent=${"%.1f".format(totalAscentMeters)}m descent=${"%.1f".format(totalDescentMeters)}m avgSpd=${"%.1f".format(timeWeightedAvgSpeed)}km/h: ${currentLogFile?.absolutePath}")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to close log", e)
@@ -386,6 +468,15 @@ class DataCaptureLogger(private val context: Context) {
             currentLogWriter = null
             currentLogFile = null
             sampleCount = 0
+            // Reset streaming aggregates so a later startNewLog() sees a clean slate.
+            elevationReferenceM = Double.NaN
+            totalAscentMeters = 0.0
+            totalDescentMeters = 0.0
+            speedWeightedTimeSec = 0.0
+            totalTimeSec = 0.0
+            previousSampleTsMs = 0L
+            tripStartTsMs = 0L
+            tripEndTsMs = 0L
             prefs.edit().remove(PREF_CURRENT_LOG_FILE).apply()
         }
     }
