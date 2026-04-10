@@ -1,6 +1,7 @@
 package com.a42r.eucosmandplugin.ui
 
 import android.app.AlertDialog
+import android.app.ProgressDialog
 import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -10,14 +11,21 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
+import androidx.lifecycle.lifecycleScope
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
+import androidx.preference.PreferenceManager
 import androidx.preference.SwitchPreference
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.a42r.eucosmandplugin.R
+import com.a42r.eucosmandplugin.ai.service.RiderProfileBuilder
 import com.a42r.eucosmandplugin.databinding.ActivitySettingsBinding
+import com.a42r.eucosmandplugin.range.database.WheelDatabase
 import com.a42r.eucosmandplugin.range.util.DataCaptureLogger
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Developer settings activity for advanced diagnostics and data capture.
@@ -69,6 +77,8 @@ class DeveloperSettingsActivity : AppCompatActivity() {
             setupDeveloperModeToggle()
             setupLoggingToggle()
             setupViewLogsButton()
+            setupRebuildProfileButton()
+            setupResetProfileButton()
         }
         
         private fun setupDeveloperModeToggle() {
@@ -111,6 +121,128 @@ class DeveloperSettingsActivity : AppCompatActivity() {
             }
         }
         
+        private fun setupRebuildProfileButton() {
+            findPreference<Preference>("rebuild_profile_from_logs")?.apply {
+                setOnPreferenceClickListener {
+                    confirmAndRebuildProfile()
+                    true
+                }
+            }
+        }
+
+        private fun setupResetProfileButton() {
+            findPreference<Preference>("reset_rider_profile")?.apply {
+                setOnPreferenceClickListener {
+                    confirmAndResetProfile()
+                    true
+                }
+            }
+        }
+
+        private fun confirmAndResetProfile() {
+            AlertDialog.Builder(requireContext())
+                .setTitle(R.string.dev_reset_rider_profile_confirm_title)
+                .setMessage(R.string.dev_reset_rider_profile_confirm_message)
+                .setPositiveButton(android.R.string.ok) { _, _ ->
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        try {
+                            withContext(Dispatchers.IO) {
+                                RiderProfileBuilder(requireContext()).resetAllProfiles()
+                            }
+                            Toast.makeText(
+                                requireContext(),
+                                R.string.dev_reset_rider_profile_done,
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        } catch (e: Exception) {
+                            Toast.makeText(
+                                requireContext(),
+                                "Reset failed: ${e.message}",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
+
+        private fun confirmAndRebuildProfile() {
+            AlertDialog.Builder(requireContext())
+                .setTitle(R.string.dev_rebuild_profile_confirm_title)
+                .setMessage(R.string.dev_rebuild_profile_confirm_message)
+                .setPositiveButton(android.R.string.ok) { _, _ -> runProfileRebuild() }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
+
+        @Suppress("DEPRECATION")
+        private fun runProfileRebuild() {
+            val ctx = requireContext()
+            val progress = ProgressDialog(ctx).apply {
+                setMessage(ctx.getString(R.string.dev_rebuild_profile_in_progress))
+                setCancelable(false)
+                show()
+            }
+
+            viewLifecycleOwner.lifecycleScope.launch {
+                try {
+                    val result = withContext(Dispatchers.IO) {
+                        val builder = RiderProfileBuilder(ctx)
+                        // Wipe everything first so this is a true rebuild.
+                        builder.resetAllProfiles()
+
+                        // Resolve fallback wheel model + battery capacity from
+                        // the currently-configured wheel. Logs captured before
+                        // v2 metadata will use these values.
+                        val defaultPrefs = PreferenceManager.getDefaultSharedPreferences(ctx)
+                        val fallbackWheel = defaultPrefs.getString("selected_wheel_model", null)
+                        val fallbackCapacity = WheelDatabase.findWheelSpec(fallbackWheel ?: "")
+                            ?.batteryConfig?.capacityWh
+                            ?: try {
+                                defaultPrefs.getInt("battery_capacity_wh", -1)
+                                    .takeIf { it != -1 }?.toDouble()
+                            } catch (e: ClassCastException) {
+                                defaultPrefs.getString("battery_capacity_wh", null)?.toDoubleOrNull()
+                            }
+                            ?: 2000.0
+
+                        val logger = DataCaptureLogger(ctx)
+                        val logDir = logger.getLogDirectoryFile()
+                        val currentLog = ctx.getSharedPreferences(
+                            "developer_settings",
+                            android.content.Context.MODE_PRIVATE
+                        ).getString("developer_current_log_file", null)
+
+                        builder.replayLogDirectory(
+                            logDir = logDir,
+                            fallbackWheelModel = fallbackWheel,
+                            fallbackBatteryCapacityWh = fallbackCapacity,
+                            onlyUnprocessed = false,
+                            skipCurrentFile = currentLog
+                        )
+                    }
+
+                    progress.dismiss()
+                    val msg = getString(
+                        R.string.dev_rebuild_profile_result,
+                        result.filesProcessed,
+                        result.filesScanned,
+                        result.samplesProcessed,
+                        result.totalDistanceKm
+                    )
+                    AlertDialog.Builder(ctx)
+                        .setTitle(R.string.dev_rebuild_profile_from_logs_title)
+                        .setMessage(msg)
+                        .setPositiveButton(android.R.string.ok, null)
+                        .show()
+                } catch (e: Exception) {
+                    progress.dismiss()
+                    Toast.makeText(ctx, "Rebuild failed: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+
         private fun showDisableDeveloperModeDialog() {
             AlertDialog.Builder(requireContext())
                 .setTitle("Disable Developer Mode")

@@ -161,6 +161,42 @@
     <string name="settings_ai_data_quality_loading">Loading…</string>
     <string name="settings_ai_data_quality_no_wheel">No wheel selected — connect or select a wheel first</string>
     <string name="settings_ai_data_quality_no_data">No riding data yet — complete some trips to build your profile</string>
+
+    <!-- Trip / Historical Data Quality (always visible, independent of AI) -->
+    <string name="settings_category_trip_history">Trip History &amp; Rider Profile</string>
+
+    <string name="settings_trip_history_title">Recorded trips</string>
+    <string name="settings_trip_history_loading">Loading…</string>
+    <string name="settings_trip_history_no_wheel">No wheel selected — connect or select a wheel first</string>
+    <string name="settings_trip_history_no_data">No trips recorded yet — enable logging in Developer Settings and ride to build your profile</string>
+
+    <string name="settings_historical_data_quality_title">Historical data quality</string>
+    <string name="settings_historical_data_quality_loading">Loading…</string>
+    <string name="settings_historical_data_quality_format">%1$s · score %2$.2f\nMore trips (20) and distance (200 km) improve accuracy</string>
+
+    <string name="settings_practical_range_title">Practical range (from your history)</string>
+    <string name="settings_practical_range_loading">Loading…</string>
+    <string name="settings_practical_range_no_data">Not enough data yet — need trips that used at least 15%% battery</string>
+    <string name="settings_practical_range_format">~%1$d km full charge · %2$.2f km per 1%%\nBased on actual trip endings, not theoretical maximum</string>
+
+    <string name="data_quality_excellent">Excellent</string>
+    <string name="data_quality_good">Good</string>
+    <string name="data_quality_sufficient">Sufficient</string>
+    <string name="data_quality_building">Building up</string>
+
+    <!-- Developer: Rider Profile Management -->
+    <string name="dev_rider_profile_category">Rider Profile</string>
+    <string name="dev_rebuild_profile_from_logs_title">Rebuild Profile from Trip Logs</string>
+    <string name="dev_rebuild_profile_from_logs_summary">Re-process saved trip logs (JSONL) to rebuild the AI rider profile</string>
+    <string name="dev_reset_rider_profile_title">Reset Rider Profile</string>
+    <string name="dev_reset_rider_profile_summary">Delete all stored rider-profile data for every wheel</string>
+    <string name="dev_reset_rider_profile_confirm_title">Reset rider profile?</string>
+    <string name="dev_reset_rider_profile_confirm_message">This will delete all stored rider profiles, speed profiles and behaviour patterns for every wheel. Trip log files on disk will NOT be affected.\n\nYou can rebuild the profile afterwards using \"Rebuild Profile from Trip Logs\".</string>
+    <string name="dev_rebuild_profile_confirm_title">Rebuild rider profile?</string>
+    <string name="dev_rebuild_profile_confirm_message">This will clear the existing rider profile and re-process every trip log file in developer storage. This may take a minute for large log files.</string>
+    <string name="dev_rebuild_profile_in_progress">Rebuilding rider profile…</string>
+    <string name="dev_rebuild_profile_result">Processed %1$d of %2$d logs — %3$d samples, %4$.1f km</string>
+    <string name="dev_reset_rider_profile_done">Rider profile cleared</string>
     <string name="settings_ai_data_quality_ready">✓ Sufficient data — AI can use your riding history</string>
     <string name="settings_ai_data_quality_more_needed">More data needed to unlock AI estimation</string>
     

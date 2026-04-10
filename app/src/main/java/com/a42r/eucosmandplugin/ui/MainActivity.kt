@@ -553,18 +553,32 @@ class MainActivity : AppCompatActivity() {
                             } else {
                                 estimate.confidence
                             }
-                            
+
                             val confidenceLabel = when {
                                 confidence >= 0.8 -> getString(R.string.range_confidence_high)
                                 confidence >= 0.5 -> getString(R.string.range_confidence_medium)
                                 else -> getString(R.string.range_confidence_low)
                             }
-                            
-                            // Add AI indicator to confidence text
-                            if (aiRangeEstimate.useAI && aiRangeEstimate.aiEnhancedEstimate != null) {
-                                "$confidenceLabel (AI)"
+
+                            // Append practical range if available (the real-world
+                            // estimate derived from the rider's historical trip
+                            // endings — usually lower than the theoretical number
+                            // shown above because riders rarely run to 0 %).
+                            val practical = aiRangeEstimate.practicalRangeKm
+                            val withPractical = if (practical != null && practical > 0) {
+                                val useMetricP = prefs.getBoolean("use_metric", true)
+                                val pVal = if (useMetricP) practical else practical * 0.621371
+                                val pUnit = if (useMetricP) "km" else "mi"
+                                "$confidenceLabel · ~${String.format("%.0f", pVal)} $pUnit practical"
                             } else {
                                 confidenceLabel
+                            }
+
+                            // Add AI indicator to confidence text
+                            if (aiRangeEstimate.useAI && aiRangeEstimate.aiEnhancedEstimate != null) {
+                                "$withPractical (AI)"
+                            } else {
+                                withPractical
                             }
                         }
                     }

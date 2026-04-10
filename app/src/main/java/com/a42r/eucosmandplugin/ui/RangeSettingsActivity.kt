@@ -18,6 +18,8 @@ import androidx.preference.ListPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.SwitchPreferenceCompat
+import androidx.preference.PreferenceCategory
+import com.a42r.eucosmandplugin.BuildConfig
 import com.a42r.eucosmandplugin.R
 import com.a42r.eucosmandplugin.ai.data.RiderProfileDatabase
 import com.a42r.eucosmandplugin.ai.data.TokenManager
@@ -120,9 +122,21 @@ class RangeSettingsActivity : AppCompatActivity() {
             
             // Update detected wheel info
             updateDetectedWheelInfo()
-            
-            // AI Settings
-            setupAIPreferences()
+
+            // AI Settings — gated behind BuildConfig.AI_RANGE_ESTIMATION_ENABLED.
+            // When the flag is false we hide the entire "AI Enhancement"
+            // category. The new "Trip History & Rider Profile" category is
+            // always visible — it's the deterministic replacement and shows
+            // trip count, distance, data quality score and the practical
+            // range derived from actual trip endings.
+            if (BuildConfig.AI_RANGE_ESTIMATION_ENABLED) {
+                setupAIPreferences()
+            } else {
+                findPreference<PreferenceCategory>("category_ai_enhancement")?.isVisible = false
+            }
+
+            // Trip history / rider profile summary (always visible).
+            updateTripHistoryInfo()
         }
         
         override fun onResume() {
@@ -137,12 +151,18 @@ class RangeSettingsActivity : AppCompatActivity() {
             findPreference<Preference>("battery_optimization_warning")?.let { pref ->
                 updateBatteryOptimizationStatus(pref)
             }
-            
-            // Update AI status
-            updateAIStatus()
-            
-            // Update AI data quality indicator
-            updateAIDataQuality()
+
+            if (BuildConfig.AI_RANGE_ESTIMATION_ENABLED) {
+                // Update AI status
+                updateAIStatus()
+
+                // Update AI data quality indicator
+                updateAIDataQuality()
+            }
+
+            // Always refresh the trip history / rider profile info — it's
+            // the deterministic replacement for the old AI data quality view.
+            updateTripHistoryInfo()
         }
         
         override fun onPause() {
@@ -485,6 +505,83 @@ class RangeSettingsActivity : AppCompatActivity() {
                 .show()
         }
         
+        /**
+         * Load rider profile from DB for the current wheel and populate the
+         * "Trip History & Rider Profile" category.
+         *
+         * Shows three read-only preferences:
+         *   1. Recorded trips         → count + total km + avg km per trip
+         *   2. Historical data quality → qualitative label + score (trips/20, dist/200)
+         *   3. Practical range        → full-charge km derived from historical km/%
+         *
+         * Always visible (independent of BuildConfig.AI_RANGE_ESTIMATION_ENABLED)
+         * because the rider profile is useful regardless of whether the AI
+         * path is active.
+         */
+        private fun updateTripHistoryInfo() {
+            val tripSummaryPref = findPreference<Preference>("trip_history_summary") ?: return
+            val qualityPref = findPreference<Preference>("historical_data_quality") ?: return
+            val practicalPref = findPreference<Preference>("practical_range_info") ?: return
+
+            val wheelModel = preferenceManager.sharedPreferences?.getString("selected_wheel_model", null)
+
+            if (wheelModel == null) {
+                tripSummaryPref.summary = getString(R.string.settings_trip_history_no_wheel)
+                qualityPref.summary = "—"
+                practicalPref.summary = "—"
+                return
+            }
+
+            viewLifecycleOwner.lifecycleScope.launch {
+                val profile = withContext(Dispatchers.IO) {
+                    RiderProfileDatabase.getInstance(requireContext())
+                        .riderProfileDao()
+                        .getProfileByWheelModel(wheelModel)
+                }
+
+                if (profile == null) {
+                    tripSummaryPref.summary = getString(R.string.settings_trip_history_no_data)
+                    qualityPref.summary = "—"
+                    practicalPref.summary = "—"
+                    return@launch
+                }
+
+                // 1. Trip summary
+                tripSummaryPref.summary =
+                    "${profile.totalTrips} trips · ${profile.totalDistanceKm.toInt()} km total · " +
+                    "avg ${profile.avgTripDistanceKm.toInt()} km/trip"
+
+                // 2. Historical data quality — same score formula as the old
+                //    AI data quality indicator, but labelled more accurately.
+                val tripScore = (profile.totalTrips / 20.0).coerceAtMost(1.0)
+                val distScore = (profile.totalDistanceKm / 200.0).coerceAtMost(1.0)
+                val score = (tripScore + distScore) / 2.0
+                val qualityLabel = when {
+                    score >= 0.8 -> getString(R.string.data_quality_excellent)
+                    score >= 0.5 -> getString(R.string.data_quality_good)
+                    score >= 0.3 -> getString(R.string.data_quality_sufficient)
+                    else -> getString(R.string.data_quality_building)
+                }
+                qualityPref.summary = getString(
+                    R.string.settings_historical_data_quality_format,
+                    qualityLabel,
+                    score
+                ) + "\n${profile.totalTrips}/20 trips · ${profile.totalDistanceKm.toInt()}/200 km"
+
+                // 3. Practical range from the historical km/%
+                if (profile.practicalKmPerPct > 0.0) {
+                    val fullChargeKm = (profile.practicalKmPerPct * 100.0).toInt()
+                    practicalPref.summary = getString(
+                        R.string.settings_practical_range_format,
+                        fullChargeKm,
+                        profile.practicalKmPerPct
+                    )
+                } else {
+                    practicalPref.summary = getString(R.string.settings_practical_range_no_data)
+                }
+            }
+        }
+
         /**
          * Load rider profile from DB for the current wheel and update the ai_data_quality preference.
          * Score formula: (min(trips/20,1) + min(distKm/200,1)) / 2  — threshold 0.3.

@@ -38,9 +38,20 @@ android {
         versionName appVersionName
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-        
+
         // Add build timestamp
         buildConfigField "String", "BUILD_DATE", "\"${new Date().format('yyyy-MM-dd HH:mm:ss')}\""
+
+        // AI range estimation feature flag.
+        //
+        // Disabled by default because the current OpenRouter-based AI
+        // adjustment does not meaningfully improve the algorithmic estimate:
+        // the 50% sanity check plus the baseline-anchored prompt make the LLM
+        // effectively a rubber-stamp (mean |adjustment| ~2.8 km). A
+        // deterministic practical-range calculation fed from historical trip
+        // data is used instead. Set this to `true` to re-enable the AI path
+        // for experimentation.
+        buildConfigField "boolean", "AI_RANGE_ESTIMATION_ENABLED", "false"
     }
 
     signingConfigs {

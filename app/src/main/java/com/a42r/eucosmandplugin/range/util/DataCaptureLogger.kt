@@ -29,14 +29,24 @@ class DataCaptureLogger(private val context: Context) {
         private const val PREF_CURRENT_LOG_FILE = "developer_current_log_file"
     }
     
+    // Use compact (non-pretty) JSON so each entry occupies a single physical line
+    // — true JSON Lines format, matching the documented ai-log-analysis schema
+    // and enabling line-oriented tooling (head / tail / streaming parse).
     private val gson = GsonBuilder()
-        .setPrettyPrinting()
+        .serializeNulls()
         .create()
     
     private val prefs = context.getSharedPreferences("developer_settings", Context.MODE_PRIVATE)
     private var currentLogFile: File? = null
     private var currentLogWriter: FileWriter? = null
     private var sampleCount = 0
+
+    // Wheel context for log metadata. Captured via [setWheelContext] when the wheel
+    // is detected, and re-emitted as a `wheel_detected` event on the current log so
+    // that [TripLogReader] can recover the wheel identity from older logs that
+    // started before detection ran.
+    private var currentWheelModel: String? = null
+    private var currentBatteryCapacityWh: Double? = null
     
     /**
      * Check if logging is enabled.
@@ -44,6 +54,31 @@ class DataCaptureLogger(private val context: Context) {
     fun isLoggingEnabled(): Boolean {
         return prefs.getBoolean(PREF_LOGGING_ENABLED, false)
     }
+
+    /**
+     * Record the currently-detected wheel so future log files can embed the wheel
+     * identity in their metadata header. If a log is already open, a
+     * `wheel_detected` event is appended so offline readers can still recover the
+     * wheel model for logs that started before detection completed.
+     *
+     * Pass null values to clear the stored context.
+     */
+    fun setWheelContext(wheelModel: String?, batteryCapacityWh: Double?) {
+        val modelChanged = currentWheelModel != wheelModel
+        currentWheelModel = wheelModel
+        currentBatteryCapacityWh = batteryCapacityWh
+
+        if (modelChanged && wheelModel != null && currentLogWriter != null) {
+            val details = mutableMapOf<String, Any?>("wheelModel" to wheelModel)
+            batteryCapacityWh?.let { details["batteryCapacityWh"] = it }
+            logEvent("wheel_detected", details)
+        }
+    }
+
+    /**
+     * Get the log directory (public accessor for offline replay).
+     */
+    fun getLogDirectoryFile(): File = getLogDirectory()
     
     /**
      * Check if currently logging (log file is open).
@@ -85,11 +120,11 @@ class DataCaptureLogger(private val context: Context) {
         try {
             currentLogWriter = FileWriter(currentLogFile, true)
             sampleCount = 0
-            
+
             // Write header metadata
-            val metadata = mapOf(
+            val metadata = mutableMapOf<String, Any?>(
                 "type" to "metadata",
-                "version" to 1,
+                "version" to 2,
                 "startTime" to System.currentTimeMillis(),
                 "startTimestamp" to timestamp,
                 "deviceInfo" to mapOf(
@@ -98,6 +133,10 @@ class DataCaptureLogger(private val context: Context) {
                     "androidVersion" to android.os.Build.VERSION.SDK_INT
                 )
             )
+            // Include wheel context if already known (used by offline replay to
+            // build rider profiles without relying on shared preferences).
+            currentWheelModel?.let { metadata["wheelModel"] = it }
+            currentBatteryCapacityWh?.let { metadata["batteryCapacityWh"] = it }
             writeJsonLine(metadata)
             
             prefs.edit().putString(PREF_CURRENT_LOG_FILE, currentLogFile?.absolutePath).apply()
@@ -140,7 +179,7 @@ class DataCaptureLogger(private val context: Context) {
                 "isValidForEstimation" to sample.isValidForEstimation,
                 "flags" to sample.flags.map { it.name }
             )
-            
+
             writeJsonLine(sampleData)
             sampleCount++
             
@@ -335,10 +374,10 @@ class DataCaptureLogger(private val context: Context) {
                     "totalSamples" to sampleCount
                 )
                 writeJsonLine(metadata)
-                
+
                 currentLogWriter?.flush()
                 currentLogWriter?.close()
-                
+
                 Log.d(TAG, "Closed log with $sampleCount samples: ${currentLogFile?.absolutePath}")
             }
         } catch (e: Exception) {

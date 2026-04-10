@@ -93,6 +93,39 @@
         android:dependency="range_estimation_enabled"
         app:iconSpaceReserved="false" />
 
+    <!-- Trip / Historical Data Quality -->
+    <PreferenceCategory
+        android:key="category_trip_history"
+        android:title="@string/settings_category_trip_history"
+        android:dependency="range_estimation_enabled"
+        app:iconSpaceReserved="false">
+
+        <Preference
+            android:key="trip_history_summary"
+            android:title="@string/settings_trip_history_title"
+            android:summary="@string/settings_trip_history_loading"
+            android:persistent="false"
+            android:selectable="false"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="historical_data_quality"
+            android:title="@string/settings_historical_data_quality_title"
+            android:summary="@string/settings_historical_data_quality_loading"
+            android:persistent="false"
+            android:selectable="false"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="practical_range_info"
+            android:title="@string/settings_practical_range_title"
+            android:summary="@string/settings_practical_range_loading"
+            android:persistent="false"
+            android:selectable="false"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
     <!-- AI Enhancement Section -->
     <PreferenceCategory
         android:key="category_ai_enhancement"

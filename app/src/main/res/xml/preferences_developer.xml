@@ -61,4 +61,22 @@
             app:iconSpaceReserved="false" />
     </PreferenceCategory>
 
+    <!-- Rider Profile Management -->
+    <PreferenceCategory
+        android:title="@string/dev_rider_profile_category"
+        app:iconSpaceReserved="false">
+
+        <Preference
+            android:key="rebuild_profile_from_logs"
+            android:title="@string/dev_rebuild_profile_from_logs_title"
+            android:summary="@string/dev_rebuild_profile_from_logs_summary"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="reset_rider_profile"
+            android:title="@string/dev_reset_rider_profile_title"
+            android:summary="@string/dev_reset_rider_profile_summary"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
 </PreferenceScreen>

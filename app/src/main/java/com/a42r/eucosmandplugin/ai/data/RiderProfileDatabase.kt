@@ -19,7 +19,10 @@ import com.a42r.eucosmandplugin.ai.model.TerrainProfile
         TerrainProfile::class,
         BehaviorPattern::class
     ],
-    version = 1,
+    // v2: added RiderProfile.practicalKmPerPct. Migration is destructive —
+    // rebuild-from-logs (Developer Settings → Rebuild Profile from Trip Logs)
+    // repopulates the profile on first run.
+    version = 2,
     exportSchema = false
 )
 abstract class RiderProfileDatabase : RoomDatabase() {

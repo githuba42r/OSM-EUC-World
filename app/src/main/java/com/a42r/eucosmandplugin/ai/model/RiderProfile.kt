@@ -14,7 +14,7 @@ data class RiderProfile(
     val batteryCapacityWh: Double,
     val createdAt: Long,
     val lastUpdatedAt: Long,
-    
+
     // Statistical summary
     val totalTrips: Int,
     val totalDistanceKm: Double,
@@ -23,9 +23,22 @@ data class RiderProfile(
     val overallAvgEfficiency: Double,
     val overallAvgSpeed: Double,
     val dataQualityScore: Double,
-    val lastRecalculated: Long
+    val lastRecalculated: Long,
+
+    /**
+     * Practical km travelled per 1 % of battery consumed, averaged across the
+     * rider's recent trips. This is the real-world "how far do I actually go
+     * per % battery" metric — distinct from the theoretical wh/km efficiency —
+     * and is used to produce a "practical range" estimate that reflects how
+     * the rider actually uses the wheel (stopping before fully depleting,
+     * stopping to charge on long rides, etc.).
+     *
+     * Zero / negative means not enough data yet — consumers should fall back
+     * to the theoretical algorithmic estimate in that case.
+     */
+    val practicalKmPerPct: Double = 0.0
 ) {
-    // Convenience properties for AI service
+    // Convenience properties
     val avgEfficiencyWhPerKm: Double get() = overallAvgEfficiency
     val avgSpeedKmh: Double get() = overallAvgSpeed
     val avgRangePerChargeKm: Double get() = if (overallAvgEfficiency > 0) batteryCapacityWh / overallAvgEfficiency else 0.0

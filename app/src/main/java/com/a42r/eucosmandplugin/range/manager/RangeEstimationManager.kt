@@ -8,6 +8,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import com.a42r.eucosmandplugin.BuildConfig
+import com.a42r.eucosmandplugin.ai.data.RiderProfileDatabase
 import com.a42r.eucosmandplugin.ai.data.TokenManager
 import com.a42r.eucosmandplugin.ai.model.AIRangeEstimate
 import com.a42r.eucosmandplugin.ai.service.RangeEstimationAIService
@@ -123,7 +125,18 @@ class RangeEstimationManager(
     private var chargingSuspectedSample: BatterySample? = null
     
     // Auto-detection state
+    // `lastDetectedWheelModelRaw` holds the raw identifier most recently received
+    // from the wheel (used only to short-circuit repeated detection passes).
+    // `lastDetectedWheelModel` holds the canonical displayName from WheelDatabase
+    // and is the value used when keying rider profile entries so that the writer
+    // and the reader (RangeSettingsActivity) look at the same Room row.
+    private var lastDetectedWheelModelRaw: String? = null
     private var lastDetectedWheelModel: String? = null
+
+    // Cached practical km-per-% from the rider profile (refreshed when the
+    // profile is updated). Zero/negative means no profile data yet → consumers
+    // fall back to the algorithmic baseline.
+    @Volatile private var cachedPracticalKmPerPct: Double = 0.0
     
     // Historical calibration
     private lateinit var historicalDataManager: HistoricalDataManager
@@ -174,7 +187,7 @@ class RangeEstimationManager(
         
         // Stop any existing collection
         stop()
-        
+
         // Start collecting EucData and producing estimates
         collectionJob = scope.launch {
             eucDataFlow
@@ -185,6 +198,16 @@ class RangeEstimationManager(
                     }
                 }
         }
+
+        // Bootstrap rider profile from any previously-captured trip logs that
+        // were never processed (e.g. because profile learning historically only
+        // ran on manual trip reset). Idempotent: already-processed files are
+        // tracked via shared prefs.
+        replayUnprocessedTripLogs()
+
+        // Load practical km/% cache from whatever profile is currently stored
+        // (refreshed again after replay completes).
+        refreshPracticalKmPerPct()
     }
     
     /**
@@ -205,14 +228,25 @@ class RangeEstimationManager(
      */
     fun resetTrip() {
         Log.d(TAG, "Manual trip reset")
-        
-        // Process completed trip for rider profile (AI learning)
-        processCompletedTripForProfile()
-        
+
+        val loggingEnabled = dataCaptureLogger.isLoggingEnabled()
+
+        // Process completed trip for rider profile (AI learning).
+        // When logging is enabled the closed log file is authoritative — we let
+        // replayUnprocessedTripLogs() pick it up after closeCurrentLog() below,
+        // so we avoid processing the same trip from both memory and disk.
+        if (!loggingEnabled) {
+            processCompletedTripForProfile()
+        }
+
         // Close current log and start new one (if logging enabled AND wheel is connected)
-        if (dataCaptureLogger.isLoggingEnabled()) {
+        if (loggingEnabled) {
             dataCaptureLogger.closeCurrentLog()
-            
+
+            // The just-closed log file now represents a completed trip — replay
+            // it (and any other unprocessed logs) into the rider profile.
+            replayUnprocessedTripLogs()
+
             if (isWheelConnected) {
                 dataCaptureLogger.startNewLog()
                 dataCaptureLogger.logEvent("trip_reset", mapOf(
@@ -607,16 +641,17 @@ class RangeEstimationManager(
         
         // Check if wheel model is available and has changed
         val wheelModel = eucData.wheelModel
-        if (wheelModel.isBlank() || wheelModel == lastDetectedWheelModel) {
+        if (wheelModel.isBlank() || wheelModel == lastDetectedWheelModelRaw) {
             return
         }
+        lastDetectedWheelModelRaw = wheelModel
         
         // Try to find wheel in database
         val wheelSpec = WheelDatabase.findWheelSpec(wheelModel)
         
         if (wheelSpec != null) {
             Log.d(TAG, "Auto-detected wheel: ${wheelSpec.displayName} - ${wheelSpec.batteryConfig.capacityWh}Wh, ${wheelSpec.batteryConfig.cellCount}S")
-            
+
             // Save configuration to SharedPreferences
             prefs.edit().apply {
                 putString("selected_wheel_model", wheelSpec.displayName)
@@ -624,15 +659,36 @@ class RangeEstimationManager(
                 putInt(PREF_CELL_COUNT, wheelSpec.batteryConfig.cellCount)
                 apply()
             }
-            
+
             // Reinitialize estimators with new configuration
             initializeEstimators()
-            
-            // Update last detected model
-            lastDetectedWheelModel = wheelModel
+
+            // Store the CANONICAL wheel key (displayName) so the rider-profile
+            // writer and reader agree on the same row in the Room DB. The raw
+            // identifier from the wheel BLE data ("EXN", "Master", …) may differ
+            // from the displayName ("Begode EX.N", "Begode Master") which is
+            // what the UI looks up.
+            lastDetectedWheelModel = wheelSpec.displayName
+
+            // Propagate wheel context to the data capture logger so future logs
+            // embed the wheel identity in their metadata.
+            if (::dataCaptureLogger.isInitialized) {
+                dataCaptureLogger.setWheelContext(
+                    wheelModel = wheelSpec.displayName,
+                    batteryCapacityWh = wheelSpec.batteryConfig.capacityWh
+                )
+            }
+
+            // Load the practical km/% from the rider profile for the newly
+            // detected wheel so the practical-range output is correct from
+            // the first estimate on.
+            refreshPracticalKmPerPct()
         } else {
             Log.w(TAG, "Wheel model '$wheelModel' not found in database")
             lastDetectedWheelModel = wheelModel
+            if (::dataCaptureLogger.isInitialized) {
+                dataCaptureLogger.setWheelContext(wheelModel, null)
+            }
         }
     }
     
@@ -916,40 +972,68 @@ class RangeEstimationManager(
      */
     private suspend fun runEstimation(): AIRangeEstimate? {
         val algorithm = prefs.getString(PREF_ALGORITHM, DEFAULT_ALGORITHM) ?: DEFAULT_ALGORITHM
-        
+
         val estimator = when (algorithm) {
             "simple_linear" -> simpleLinearEstimator
             "weighted_window" -> weightedWindowEstimator
             else -> weightedWindowEstimator  // Default to weighted window
         }
-        
+
         // Get baseline estimate
         val baselineEstimate = estimator.estimate(tripSnapshot) ?: return null
-        
-        // Check if we should use AI enhancement
-        val shouldUseAI = prefs.getBoolean("ai_range_estimation_enabled", false) &&
+
+        // Compute deterministic practical range from the rider's historical
+        // km-per-energy-% metric and the current voltage-derived energy %.
+        //
+        // IMPORTANT: practicalKmPerPct is stored as km per 1 % of
+        // **voltage-derived energy** (via LiIonDischargeCurve), NOT km per
+        // 1 % of wheel-reported battery. We therefore multiply by the
+        // current energy % from the compensated voltage to produce a
+        // consistent km output. Using the wheel's batteryPercent here
+        // instead would reintroduce the non-linearity the profile metric
+        // was designed to factor out.
+        val latestSample = tripSnapshot.latestSample
+        val practicalKmPerEnergyPct = cachedPracticalKmPerPct
+        val practicalRangeKm = if (practicalKmPerEnergyPct > 0.0 && latestSample != null) {
+            val currentEnergyPct = LiIonDischargeCurve.voltageToEnergyPercent(
+                latestSample.compensatedVoltage,
+                getCellCount()
+            )
+            if (currentEnergyPct > 0.0) practicalKmPerEnergyPct * currentEnergyPct else null
+        } else null
+
+        // Check if we should use AI enhancement. Gated behind a build-time
+        // flag (BuildConfig.AI_RANGE_ESTIMATION_ENABLED) — when false the AI
+        // path is completely skipped and the baseline/practical estimates are
+        // the only outputs. See build.gradle for rationale.
+        val aiBuildEnabled = BuildConfig.AI_RANGE_ESTIMATION_ENABLED
+        val shouldUseAI = aiBuildEnabled &&
+                          prefs.getBoolean("ai_range_estimation_enabled", false) &&
                           tokenManager.isAiReady() &&
                           !tripSnapshot.isCurrentlyCharging &&
                           baselineEstimate.rangeKm != null &&
                           lastDetectedWheelModel != null
-        
+
         if (!shouldUseAI) {
-            // Return baseline only
+            // Return baseline + practical (no AI)
             return AIRangeEstimate(
                 baselineEstimate = baselineEstimate,
                 aiEnhancedEstimate = null,
                 useAI = false,
                 reason = when {
+                    !aiBuildEnabled -> "AI disabled at build time"
                     !prefs.getBoolean("ai_range_estimation_enabled", false) -> "AI disabled in settings"
                     !tokenManager.isAiReady() -> "AI not configured"
                     tripSnapshot.isCurrentlyCharging -> "Currently charging"
                     baselineEstimate.rangeKm == null -> "Insufficient data for baseline"
                     lastDetectedWheelModel == null -> "Wheel model unknown"
                     else -> "AI not available"
-                }
+                },
+                practicalRangeKm = practicalRangeKm,
+                practicalKmPerPct = if (practicalKmPerEnergyPct > 0.0) practicalKmPerEnergyPct else null
             )
         }
-        
+
         // Enhance with AI (suspend call, runs on IO dispatcher)
         val aiResult = rangeEstimationAIService.enhanceRangeEstimate(
             trip = tripSnapshot,
@@ -957,13 +1041,44 @@ class RangeEstimationManager(
             wheelModel = lastDetectedWheelModel,
             batteryCapacityWh = getBatteryCapacity()
         )
-        
-        return aiResult.getOrNull() ?: AIRangeEstimate(
+
+        val aiEstimate = aiResult.getOrNull() ?: AIRangeEstimate(
             baselineEstimate = baselineEstimate,
             aiEnhancedEstimate = null,
             useAI = false,
             reason = "AI enhancement failed: ${aiResult.exceptionOrNull()?.message}"
         )
+        // Ensure the practical range fields are populated regardless of the AI
+        // path (so the UI can always show a practical number alongside).
+        return aiEstimate.copy(
+            practicalRangeKm = practicalRangeKm,
+            practicalKmPerPct = if (practicalKmPerEnergyPct > 0.0) practicalKmPerEnergyPct else null
+        )
+    }
+
+    /**
+     * Refresh [cachedPracticalKmPerPct] from the rider profile DB. Called
+     * during [start] and after the trip-log replay finishes so the cached
+     * value is always up to date with the latest rebuild.
+     */
+    private fun refreshPracticalKmPerPct() {
+        val wheelModel = lastDetectedWheelModel
+            ?: prefs.getString("selected_wheel_model", null)
+            ?: return
+        scope.launch {
+            try {
+                val profile = RiderProfileDatabase.getInstance(context)
+                    .riderProfileDao()
+                    .getProfileByWheelModel(wheelModel)
+                val km = profile?.practicalKmPerPct ?: 0.0
+                if (km > 0.0 && km != cachedPracticalKmPerPct) {
+                    cachedPracticalKmPerPct = km
+                    Log.d(TAG, "Practical km/% cached for $wheelModel: ${String.format("%.3f", km)}")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to refresh practical km/%: ${e.message}")
+            }
+        }
     }
     
     /**
@@ -1193,7 +1308,13 @@ class RangeEstimationManager(
     
     /**
      * Process completed trip for AI rider profile learning.
+     *
      * Called before trip reset to extract patterns and update rider profile.
+     *
+     * NOTE: When developer logging is enabled the log file is the source of
+     * truth — profile learning happens in [replayUnprocessedTripLogs] after the
+     * log file is closed. In that case we skip the in-memory path to avoid
+     * double-counting the same trip.
      */
     private fun processCompletedTripForProfile() {
         // Only process if trip has meaningful data
@@ -1201,38 +1322,83 @@ class RangeEstimationManager(
             Log.d(TAG, "Trip too short for profile learning (${tripSnapshot.samples.size} samples)")
             return
         }
-        
+
         val distanceKm = tripSnapshot.totalDistanceKm
         if (distanceKm < 1.0) {
             Log.d(TAG, "Trip distance too short for profile learning (${String.format("%.2f", distanceKm)} km)")
             return
         }
-        
-        // Get wheel model
-        val wheelModel = lastDetectedWheelModel
-        if (wheelModel.isNullOrBlank()) {
+
+        // Get wheel model (canonical displayName — see autoDetectWheelConfiguration)
+        val rawWheelModel = lastDetectedWheelModel
+        if (rawWheelModel.isNullOrBlank()) {
             Log.d(TAG, "No wheel model detected - skipping profile update")
             return
         }
-        
+
         // Get battery capacity from settings
         val batteryCapacityWh = getBatteryCapacity()
-        
+
         // Process trip asynchronously (don't block trip reset)
+        val snapshot = tripSnapshot
         scope.launch {
             try {
-                Log.d(TAG, "Processing trip for profile learning: $wheelModel, ${tripSnapshot.samples.size} samples, ${String.format("%.2f", distanceKm)} km")
-                
                 val profileBuilder = RiderProfileBuilder(context)
+                val canonicalWheel = profileBuilder.canonicalWheelKey(rawWheelModel) ?: rawWheelModel
+                Log.d(TAG, "Processing trip for profile learning: $canonicalWheel, " +
+                        "${snapshot.samples.size} samples, ${String.format("%.2f", distanceKm)} km")
+
                 profileBuilder.processTripForProfile(
-                    trip = tripSnapshot,
-                    wheelModel = wheelModel,
+                    trip = snapshot,
+                    wheelModel = canonicalWheel,
                     batteryCapacityWh = batteryCapacityWh
                 )
-                
+
                 Log.d(TAG, "Profile update completed successfully")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to process trip for profile: ${e.message}", e)
+            }
+        }
+    }
+
+    /**
+     * Scan the developer trip-logs directory and feed any unprocessed log files
+     * into [RiderProfileBuilder]. Invoked from [start] so that historical logs
+     * captured before this fix ran are used to bootstrap the rider profile.
+     *
+     * Skips the currently-open log file (if any) to avoid replaying a partial
+     * capture that is still being written.
+     */
+    private fun replayUnprocessedTripLogs() {
+        scope.launch {
+            try {
+                val logger = if (::dataCaptureLogger.isInitialized) dataCaptureLogger
+                    else DataCaptureLogger(context)
+                val logDir = logger.getLogDirectoryFile()
+                if (!logDir.exists()) return@launch
+
+                val currentLog = prefs.getString("developer_current_log_file", null)
+                val fallbackWheelModel = lastDetectedWheelModel
+                    ?: prefs.getString("selected_wheel_model", null)
+                val fallbackBatteryCapacityWh = getBatteryCapacity()
+
+                val builder = RiderProfileBuilder(context)
+                val result = builder.replayLogDirectory(
+                    logDir = logDir,
+                    fallbackWheelModel = fallbackWheelModel,
+                    fallbackBatteryCapacityWh = fallbackBatteryCapacityWh,
+                    onlyUnprocessed = true,
+                    skipCurrentFile = currentLog
+                )
+                if (result.filesProcessed > 0) {
+                    Log.i(TAG, "Bootstrapped rider profile from ${result.filesProcessed} " +
+                            "trip log(s) (${result.samplesProcessed} samples, " +
+                            "${String.format("%.2f", result.totalDistanceKm)} km)")
+                    // Profile was just updated — refresh the cached value.
+                    refreshPracticalKmPerPct()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to replay trip logs for profile bootstrap", e)
             }
         }
     }
