@@ -369,60 +369,75 @@ class WeightedWindowEstimator(
         latestTimestamp: Long
     ): Double {
         if (samples.isEmpty()) return Double.NaN
-        
+
         // Require minimum sample count (at least 25 seconds of riding at 2 Hz)
         if (samples.size < 50) return Double.NaN
-        
+
         // Require minimum distance traveled in window (at least 500m)
-        val distanceTraveled = (samples.maxOfOrNull { it.tripDistanceKm } ?: 0.0) - 
+        val distanceTraveled = (samples.maxOfOrNull { it.tripDistanceKm } ?: 0.0) -
                               (samples.minOfOrNull { it.tripDistanceKm } ?: 0.0)
         if (distanceTraveled < 0.5) return Double.NaN
-        
-        // Collect all valid efficiency values (including negative for regen braking)
-        val validEfficiencies = samples
-            .map { it.instantEfficiencyWhPerKm }
-            .filter { !it.isNaN() && it > -MAX_EFFICIENCY && it < MAX_EFFICIENCY }
-        
-        if (validEfficiencies.size < 50) return Double.NaN
-        
-        // Apply IQR-based outlier filtering to remove extreme acceleration/braking
-        // Sort efficiencies to find quartiles
-        val sortedEfficiencies = validEfficiencies.sorted()
-        val q1Index = (sortedEfficiencies.size * 0.25).toInt()
-        val q3Index = (sortedEfficiencies.size * 0.75).toInt()
-        val q1 = sortedEfficiencies[q1Index]
-        val q3 = sortedEfficiencies[q3Index]
-        val iqr = q3 - q1
-        
-        // Define outlier bounds: Q1 - 1.5*IQR and Q3 + 1.5*IQR
-        // This is a standard statistical method that keeps ~99.3% of normal data
-        val lowerBound = q1 - 1.5 * iqr
-        val upperBound = q3 + 1.5 * iqr
-        
-        var weightedSum = 0.0
+
+        // IMPORTANT — physically correct efficiency aggregation.
+        //
+        // Previous implementation: mean(powerWatts_i / speedKmh_i) with IQR
+        // outlier filtering on that ratio. The arithmetic mean of per-sample
+        // instant-efficiency values systematically *under-estimates* true Wh/km
+        // when speed varies across the window, because at fixed time intervals
+        // a high-speed sample covers more distance per interval and should
+        // contribute proportionally more to the denominator. The IQR filter
+        // then compounded the bias by rejecting hard-acceleration samples
+        // (high instant Wh/km) whose power contribution is real physics. On
+        // real Sherman S trip logs this produced initial range estimates of
+        // ~155-170 km vs an actual expected ~100 km.
+        //
+        // Correct aggregation: efficiency = total_energy / total_distance
+        //   = Σ(P_i · dt) / Σ(S_i · dt)
+        //   = Σ(P_i · w_i) / Σ(S_i · w_i)   (uniform dt, exponential decay w_i)
+        //
+        // With this aggregation, outliers cannot bias the result because each
+        // sample contributes proportionally to both numerator and denominator.
+        // The only filter we keep is the ±MAX_EFFICIENCY sanity bound to
+        // reject sensor glitches (e.g. a 500 Wh/km spike from a bad read).
+        // Stopped samples (speed <= 1.0) have NaN instant efficiency and are
+        // naturally excluded. Regen samples contribute negative power and
+        // positive speed — the correct physical accounting for recovered
+        // energy.
+
+        var weightedSumPower = 0.0
+        var weightedSumSpeed = 0.0
         var weightSum = 0.0
-        
+        var contributingSamples = 0
+
         samples.forEach { sample ->
             val efficiency = sample.instantEfficiencyWhPerKm
-            
-            // Filter: valid values within outlier bounds
-            if (!efficiency.isNaN() && 
-                efficiency >= lowerBound && 
-                efficiency <= upperBound) {
-                
-                // Calculate age in minutes
-                val ageSeconds = (latestTimestamp - sample.timestamp) / 1000.0
-                val ageMinutes = ageSeconds / 60.0
-                
-                // Exponential decay weight: more recent = higher weight
+
+            // Skip stopped samples (NaN) and sensor-glitch outliers whose
+            // instant Wh/km is outside the realistic range.
+            if (!efficiency.isNaN() &&
+                efficiency > -MAX_EFFICIENCY &&
+                efficiency < MAX_EFFICIENCY) {
+
+                // Exponential decay weight: more recent = higher weight.
+                val ageMinutes = (latestTimestamp - sample.timestamp) / 60000.0
                 val weight = exp(-weightDecayFactor * ageMinutes / windowMinutes)
-                
-                weightedSum += efficiency * weight
+
+                // Accumulate power and speed separately. The ratio of these
+                // weighted sums is the distance-weighted (true) efficiency.
+                weightedSumPower += sample.powerWatts * weight
+                weightedSumSpeed += sample.speedKmh * weight
                 weightSum += weight
+                contributingSamples++
             }
         }
-        
-        return if (weightSum > 0) weightedSum / weightSum else Double.NaN
+
+        if (contributingSamples < 50) return Double.NaN
+
+        return if (weightSum > 0 && weightedSumSpeed > 0) {
+            weightedSumPower / weightedSumSpeed
+        } else {
+            Double.NaN
+        }
     }
     
     /**
