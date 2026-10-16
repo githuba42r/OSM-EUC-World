@@ -1,32 +1,60 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="360" height="760" viewBox="0 0 360 760">
-  <!-- Placeholder mockup: Android Auto HUD (replace with a real screenshot when available) -->
-  <rect width="360" height="760" fill="#101a26"/>
-  <rect width="360" height="64" fill="#060a10"/>
-  <rect x="124" y="22" width="112" height="4" rx="2" fill="#34495e"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="780" viewBox="0 0 360 780">
+  <!-- Interface mockup: Android Auto PaneTemplate, faithful to auto/EucWorldScreen.kt
+       (Car App Library chrome: dark surface, white titles, app icon header action,
+       action strip "Trip Meters" button, rows: battery/voltage + trip meters line) -->
+  <rect width="360" height="780" fill="#101014"/>
 
-  <!-- Car screen bezel -->
-  <rect x="0" y="120" width="360" height="420" rx="24" fill="#02040a" stroke="#34495e" stroke-width="2"/>
-  <rect x="30" y="150" width="300" height="56" fill="#0a0f18"/>
-  <text x="180" y="186" font-family="sans-serif" font-size="15" fill="#92a3b4" text-anchor="middle">EUC World + OsmAnd Plugin &#8212; Auto</text>
+  <!-- Car display bezel -->
+  <rect x="10" y="140" width="340" height="300" rx="22" fill="none" stroke="#3A3A42" stroke-width="2"/>
 
-  <text x="180" y="290" font-family="sans-serif" font-size="54" font-weight="800" fill="#03DAC5" text-anchor="middle">85% | 84.2V</text>
-  <text x="180" y="330" font-family="sans-serif" font-size="20" fill="#e3eaf2" text-anchor="middle">Connected &#8212; InMotion V12</text>
+  <!-- Header: app icon + title "InMotion V12 • Connected" + action strip button -->
+  <g transform="translate(10,140)">
+    <rect width="340" height="300" rx="22" fill="#1B1B20"/>
+    <rect x="0" y="0" width="340" height="64" rx="22" fill="#24242A"/>
+    <rect x="212" y="0" width="128" height="64" rx="22" fill="#24242A"/>
+    <!-- app icon -->
+    <rect x="18" y="18" width="28" height="28" rx="6" fill="#2196F3"/>
+    <rect x="26" y="23" width="12" height="18" rx="2" fill="#FFFFFF"/>
+    <rect x="29" y="20" width="6" height="4" rx="1" fill="#FFFFFF"/>
+    <rect x="26" y="31" width="12" height="10" rx="1" fill="#4CAF50"/>
+    <text x="58" y="38" font-family="sans-serif" font-size="19" font-weight="600" fill="#FFFFFF">InMotion V12 &#8226; Connected</text>
+    <!-- action strip -->
+    <rect x="262" y="18" width="70" height="28" rx="14" fill="#39393F"/>
+    <text x="297" y="37" font-family="sans-serif" font-size="12" font-weight="600" fill="#FFFFFF" text-anchor="middle">Trip Meters</text>
 
-  <g font-family="sans-serif" text-anchor="middle">
-    <rect x="42" y="370" width="130" height="40" rx="10" fill="#0a0f18" stroke="#223244"/>
-    <text x="107" y="397" font-size="18" fill="#e3eaf2">28.4 km/h</text>
-    <rect x="188" y="370" width="130" height="40" rx="10" fill="#0a0f18" stroke="#223244"/>
-    <text x="253" y="397" font-size="18" fill="#e3eaf2">38&#176;C</text>
-    <rect x="42" y="420" width="130" height="40" rx="10" fill="#0a0f18" stroke="#223244"/>
-    <text x="107" y="447" font-size="18" fill="#e3eaf2">1 250 W</text>
-    <rect x="188" y="420" width="130" height="40" rx="10" fill="#0a0f18" stroke="#223244"/>
-    <text x="253" y="447" font-size="18" fill="#e3eaf2">Load 62%</text>
+    <!-- Row 1: battery % + voltage -->
+    <text x="24" y="112" font-family="sans-serif" font-size="30" font-weight="700" fill="#FFFFFF">85%</text>
+    <text x="24" y="146" font-family="sans-serif" font-size="21" fill="#BBBBBE">84.20 V</text>
+    <line x1="24" y1="170" x2="316" y2="170" stroke="#33333A" stroke-width="1"/>
+
+    <!-- Row 2: trip meters spelled out one line -->
+    <text x="24" y="204" font-family="sans-serif" font-size="21" font-weight="600" fill="#FFFFFF">Trip Meters</text>
+    <text x="24" y="236" font-family="sans-serif" font-size="16" fill="#BBBBBE">A: 15.2 km &#8226; B: 127.8 km</text>
+    <text x="24" y="262" font-family="sans-serif" font-size="16" fill="#BBBBBE">&#8226; C: 1450.3 km</text>
   </g>
 
-  <rect x="30" y="480" width="300" height="44" rx="10" fill="#0a0f18" stroke="#223244"/>
-  <text x="180" y="508" font-family="sans-serif" font-size="15" fill="#92a3b4" text-anchor="middle">Trip A 15.2 km &#183; Trip B 127.8 km &#183; Trip C 1 450.3 km</text>
+  <!-- Android Auto bottom nav bar -->
+  <g transform="translate(10,452)">
+    <rect width="340" height="48" rx="10" fill="#0E0E12" stroke="#3A3A42" stroke-width="1"/>
+    <circle cx="46"  cy="24" r="13" fill="none" stroke="#8E8E93" stroke-width="2"/>
+    <path d="M 12 24 L 20 16 M 12 24 L 20 32" stroke="#8E8E93" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M 298 13 A 12 12 0 1 1 286 25 L 286 35" fill="none" stroke="#8E8E93" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="296" cy="24" r="9" fill="none" stroke="#8E8E93" stroke-width="2"/>
+    <rect x="156" y="12" width="28" height="24" rx="4" fill="none" stroke="#8E8E93" stroke-width="2"/>
+    <circle cx="170" cy="24" r="5" fill="none" stroke="#8E8E93" stroke-width="2"/>
+  </g>
 
-  <rect x="0" y="590" width="360" height="48" fill="#16222f" stroke="#223244"/>
-  <text x="180" y="620" font-family="sans-serif" font-size="13" fill="#92a3b4" text-anchor="middle">Car display: wired &amp; wireless Android Auto</text>
-  <text x="180" y="700" font-family="sans-serif" font-size="13" fill="#92a3b4" text-anchor="middle">Glance-optimised &#8212; read-only by design</text>
+  <text x="180" y="560" font-family="sans-serif" font-size="13" fill="#92a3b4" text-anchor="middle">Read-only pane on the car display &#8212; wired &amp; wireless Android Auto</text>
+  <text x="180" y="582" font-family="sans-serif" font-size="13" fill="#92a3b4" text-anchor="middle">Car App template rows mirror the phone app's data</text>
+
+  <!-- continuation: trip meter detail screen pushed by the Trip Meters action -->
+  <text x="180" y="664" font-family="sans-serif" font-size="15" font-weight="700" letter-spacing="0.08em" fill="#92a3b4" text-anchor="middle">TRIP METERS DETAIL SCREEN</text>
+  <g transform="translate(10,676)">
+    <rect width="340" height="88" rx="14" fill="#1B1B20" stroke="#3A3A42" stroke-width="1"/>
+    <text x="24" y="34" font-family="sans-serif" font-size="18" font-weight="600" fill="#FFFFFF">A: 15.2 km</text>
+    <text x="316" y="34" font-family="sans-serif" font-size="12" font-weight="600" fill="#03DAC5" text-anchor="end">RESET</text>
+    <line x1="24" y1="44" x2="316" y2="44" stroke="#33333A" stroke-width="1"/>
+    <text x="24" y="70" font-family="sans-serif" font-size="18" font-weight="600" fill="#FFFFFF">B: 127.8 km</text>
+    <text x="316" y="70" font-family="sans-serif" font-size="12" font-weight="600" fill="#03DAC5" text-anchor="end">RESET</text>
+  </g>
 </svg>
