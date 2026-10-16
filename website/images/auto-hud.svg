@@ -1,11 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="360" height="780" viewBox="0 0 360 780">
-  <!-- Interface mockup: Android Auto PaneTemplate, faithful to auto/EucWorldScreen.kt
-       (Car App Library chrome: dark surface, white titles, app icon header action,
-       action strip "Trip Meters" button, rows: battery/voltage + trip meters line) -->
+  <!-- Interface mockup: Android Auto PaneTemplate on the Motoeye E6 helmet HUD,
+       faithful to auto/EucWorldScreen.kt (Car App Library chrome: dark surface,
+       white titles, app icon header action, action strip "Trip Meters" button,
+       rows: battery/voltage + trip meters line) -->
   <rect width="360" height="780" fill="#101014"/>
 
-  <!-- Car display bezel -->
+  <!-- Car display bezel (helmet HUD projection surface) -->
   <rect x="10" y="140" width="340" height="300" rx="22" fill="none" stroke="#3A3A42" stroke-width="2"/>
+
+  <!-- Helmet HUD bezel: mount bracket hint + E6-style wide LCD -->
+  <path d="M 60 108 L 60 140 M 300 108 L 300 140" stroke="#3A3A42" stroke-width="3"/>
 
   <!-- Header: app icon + title "InMotion V12 • Connected" + action strip button -->
   <g transform="translate(10,140)">
