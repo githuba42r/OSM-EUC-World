@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="760" viewBox="0 0 360 760">
+  <!-- Placeholder mockup: OsmAnd map widgets (replace with a real screenshot when available) -->
+  <rect width="360" height="760" fill="#101a26"/>
+  <rect width="360" height="64" fill="#060a10"/>
+  <rect x="124" y="22" width="112" height="4" rx="2" fill="#34495e"/>
+  <rect width="360" height="48" y="64" fill="#0a2239"/>
+  <text x="16" y="94" font-family="sans-serif" font-size="14" fill="#e3eaf2" dy="0">&#9776; Configure screen &#8250; Left panel &#8250; Widgets</text>
+
+  <!-- Map area -->
+  <rect x="0" y="112" width="360" height="520" fill="#0d1b2a"/>
+  <g stroke="#223244" stroke-width="2" fill="none">
+    <path d="M 40 200 C 120 240 90 340 180 360 C 270 380 300 480 260 560"/>
+    <path d="M 0 300 L 360 260"/>
+    <path d="M 0 440 L 360 500"/>
+    <path d="M 130 112 L 110 632"/>
+  </g>
+  <g fill="#223244">
+    <rect x="30" y="150" width="60" height="70" rx="6"/>
+    <rect x="220" y="150" width="90" height="60" rx="6"/>
+    <rect x="240" y="430" width="70" height="60" rx="6"/>
+    <rect x="20" y="540" width="80" height="70" rx="6"/>
+  </g>
+
+  <!-- Left/right map widget chips -->
+  <g>
+    <rect x="12" y="140" width="130" height="34" rx="8" fill="#16222f" stroke="#34495e"/>
+    <text x="24" y="162" font-family="sans-serif" font-size="13" fill="#03DAC5">&#128267; 85% 84.2V</text>
+    <rect x="12" y="182" width="130" height="34" rx="8" fill="#16222f" stroke="#34495e"/>
+    <text x="24" y="204" font-family="sans-serif" font-size="13" fill="#4CAF50">&#128666; Trip A 15.2</text>
+    <rect x="12" y="224" width="130" height="34" rx="8" fill="#16222f" stroke="#34495e"/>
+    <text x="24" y="246" font-family="sans-serif" font-size="13" fill="#e3eaf2">&#128666; Trip B 127.8</text>
+
+    <rect x="218" y="140" width="130" height="34" rx="8" fill="#16222f" stroke="#34495e"/>
+    <text x="230" y="162" font-family="sans-serif" font-size="13" fill="#e3eaf2">&#9889; 84.2V</text>
+    <rect x="218" y="182" width="130" height="34" rx="8" fill="#16222f" stroke="#34495e"/>
+    <text x="230" y="204" font-family="sans-serif" font-size="13" fill="#e3eaf2">&#128267; 85%</text>
+    <rect x="218" y="224" width="130" height="34" rx="8" fill="#16222f" stroke="#34495e"/>
+    <text x="230" y="246" font-family="sans-serif" font-size="13" fill="#e3eaf2">&#128666; Trip C 1 450</text>
+  </g>
+
+  <!-- Location pin -->
+  <path d="M 180 520 C 158 520 140 538 140 560 C 140 600 180 640 180 640 C 180 640 220 600 220 560 C 220 538 202 520 180 520 Z" fill="#2196F3"/>
+  <circle cx="180" cy="556" r="18" fill="#101a26"/>
+
+  <rect x="0" y="648" width="360" height="48" fill="#0a2239"/>
+  <text x="180" y="678" font-family="sans-serif" font-size="13" fill="#92a3b4" text-anchor="middle">OsmAnd left / right panel widgets &#8212; live updates while riding</text>
+</svg>

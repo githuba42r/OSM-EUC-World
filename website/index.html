@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EUC OsmAnd Plugin — Electric Unicycle metrics on OsmAnd, Android Auto &amp; your home screen</title>
+  <meta name="description" content="EUC OsmAnd Plugin is an open-source Android app that streams Electric Unicycle data from EUC World to OsmAnd map widgets, an Android Auto car display, home screen widgets, and a HUD-style phone app with three independent trip meters.">
+  <link rel="icon" href="images/icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="site-head">
+  <div class="wrap head-row">
+    <a class="brand" href="index.html" aria-label="EUC OsmAnd Plugin home">
+      <img class="brand-mark" src="images/icon.png" alt="" width="30" height="30">
+      <span class="brand-name">EUC OsmAnd Plugin</span>
+    </a>
+    <nav class="head-nav" aria-label="Main">
+      <a href="index.html" aria-current="page">App</a>
+      <a href="widgets.html">Widgets</a>
+      <a href="auto.html">Android Auto</a>
+      <a href="github.html">GitHub</a>
+      <a href="privacy.html">Privacy</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <h1>Your wheel, on every screen you ride with.</h1>
+        <p class="lede">EUC OsmAnd Plugin reads live Electric Unicycle data from the
+        EUC World app and puts it where you want it: OsmAnd map widgets on the ride
+        map, a glance-safe Android Auto display in the car, a home screen widget,
+        and a HUD-style phone app. Three independent trip meters keep daily,
+        periodic and lifetime distances apart.</p>
+        <div class="cta-row">
+          <a class="btn" href="https://github.com/githuba42r/OSM-EUC-World/releases/latest">Get the app</a>
+          <a class="btn btn-ghost" href="github.html">Build from source</a>
+          <a class="btn btn-ghost" href="widgets.html">See the widgets</a>
+        </div>
+      </div>
+      <div class="hero-shots">
+        <figure class="frame phone">
+          <img src="images/app-main.svg" alt="Mockup of the main phone screen: HUD-style battery and voltage readout with speed, temperature, power, load and trip meters.">
+        </figure>
+        <figure class="frame phone phone-behind">
+          <img src="images/osmand-widgets.svg" alt="Mockup of OsmAnd map widgets showing battery, voltage and trip distances overlaid on the map.">
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <section id="features" class="band">
+    <div class="wrap">
+      <h2>What it does</h2>
+      <div class="feature-grid">
+        <article class="card">
+          <h3>OsmAnd map widgets</h3>
+          <p>Battery &amp; voltage, battery %, voltage, and Trip A/B/C widgets on
+          the OsmAnd map's left or right panels, updating live while you ride.
+          <a href="widgets.html">Widget setup &rarr;</a></p>
+        </article>
+        <article class="card">
+          <h3>Android Auto display</h3>
+          <p>A car-optimised, read-only HUD: battery, voltage, speed, temperature,
+          power and load on your car's screen, wired or wireless.
+          <a href="auto.html">The Auto integration &rarr;</a></p>
+        </article>
+        <article class="card">
+          <h3>Home screen widget</h3>
+          <p>A compact widget with battery %, voltage and speed, updated in
+          real time while the background service runs.</p>
+        </article>
+        <article class="card">
+          <h3>HUD phone app</h3>
+          <p>Large, readable battery and voltage display with real-time speed,
+          temperature, power and load, plus wheel model identification and
+          connection status.</p>
+        </article>
+        <article class="card">
+          <h3>Three trip meters</h3>
+          <p>Independent A/B/C meters anchored to the wheel's odometer — daily
+          commutes, periodic totals, service intervals. Reset individually or
+          all at once.</p>
+        </article>
+        <article class="card">
+          <h3>Everything stays on device</h3>
+          <p>No account, no analytics, no ads. Data flows only from EUC World's
+          internal webservice to the app on your phone.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="screens" class="band band-alt">
+    <div class="wrap">
+      <h2>The screens</h2>
+      <p class="section-lede">The interfaces below are currently shown as interface
+      mockups — real screenshots will replace them shortly.</p>
+      <div class="shot-row">
+        <figure class="frame phone">
+          <img src="images/app-main.svg" alt="Mockup of the main phone app screen.">
+          <figcaption>Main phone app — battery, voltage, live metrics and trips</figcaption>
+        </figure>
+        <figure class="frame phone">
+          <img src="images/osmand-widgets.svg" alt="Mockup of OsmAnd map widgets.">
+          <figcaption>OsmAnd — live widgets on the map panels</figcaption>
+        </figure>
+        <figure class="frame phone">
+          <img src="images/auto-hud.svg" alt="Mockup of the Android Auto HUD.">
+          <figcaption>Android Auto — the in-car HUD</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <section id="setup" class="band">
+    <div class="wrap">
+      <h2>Getting started</h2>
+      <p class="section-lede">All it needs is a wheel connected to EUC World.</p>
+      <ol class="step-list">
+        <li><strong>Install the app.</strong> Grab the signed APK from the
+        <a href="https://github.com/githuba42r/OSM-EUC-World/releases/latest">latest release</a>
+        and sideload it (Android 8.0+).</li>
+        <li><strong>Enable EUC World's internal webservice.</strong> In EUC World,
+        go to Settings &gt; Internal Webservice (default port 8080) and connect
+        your wheel.</li>
+        <li><strong>Launch the plugin.</strong> The background service starts
+        automatically and polls the EUC World API — the status shows
+        &ldquo;Connected&rdquo; with your wheel model.</li>
+        <li><strong>Add your surfaces.</strong> Enable the OsmAnd widgets under
+        <a href="widgets.html">Configure screen</a>, open the app from the
+        <a href="auto.html">Android Auto</a> launcher in the car, or drop the home
+        screen widget onto your launcher.</li>
+      </ol>
+      <div class="note">
+        <p><strong>Requirements:</strong> Android 8.0 (API 26) or higher,
+        <a href="https://euc.world">EUC World</a> with the internal webservice
+        enabled, and any EUC supported by EUC World. <a href="https://osmand.net">OsmAnd</a>
+        and Android Auto are optional surfaces.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="band band-cta">
+    <div class="wrap cta-block">
+      <h2>Ride with the data on display.</h2>
+      <p>Open source, open process: the full source is on GitHub and signed APK
+      releases are published automatically for every release tag.</p>
+      <div class="cta-row">
+        <a class="btn" href="https://github.com/githuba42r/OSM-EUC-World/releases/latest">Get the app</a>
+        <a class="btn btn-ghost" href="https://github.com/githuba42r/OSM-EUC-World">View the source</a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-foot">
+  <div class="wrap foot-row">
+    <span>EUC OsmAnd Plugin — EUC World data, on the map, in the car, on the home screen.</span>
+    <nav aria-label="Footer">
+      <a href="https://github.com/githuba42r/OSM-EUC-World/releases/latest">Releases</a>
+      <a href="github.html">GitHub</a>
+      <a href="privacy.html">Privacy</a>
+    </nav>
+  </div>
+</footer>
+
+</body>
+</html>

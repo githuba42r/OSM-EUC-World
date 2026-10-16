@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="760" viewBox="0 0 360 760">
+  <!-- Placeholder mockup: Android Auto HUD (replace with a real screenshot when available) -->
+  <rect width="360" height="760" fill="#101a26"/>
+  <rect width="360" height="64" fill="#060a10"/>
+  <rect x="124" y="22" width="112" height="4" rx="2" fill="#34495e"/>
+
+  <!-- Car screen bezel -->
+  <rect x="0" y="120" width="360" height="420" rx="24" fill="#02040a" stroke="#34495e" stroke-width="2"/>
+  <rect x="30" y="150" width="300" height="56" fill="#0a0f18"/>
+  <text x="180" y="186" font-family="sans-serif" font-size="15" fill="#92a3b4" text-anchor="middle">EUC World + OsmAnd Plugin &#8212; Auto</text>
+
+  <text x="180" y="290" font-family="sans-serif" font-size="54" font-weight="800" fill="#03DAC5" text-anchor="middle">85% | 84.2V</text>
+  <text x="180" y="330" font-family="sans-serif" font-size="20" fill="#e3eaf2" text-anchor="middle">Connected &#8212; InMotion V12</text>
+
+  <g font-family="sans-serif" text-anchor="middle">
+    <rect x="42" y="370" width="130" height="40" rx="10" fill="#0a0f18" stroke="#223244"/>
+    <text x="107" y="397" font-size="18" fill="#e3eaf2">28.4 km/h</text>
+    <rect x="188" y="370" width="130" height="40" rx="10" fill="#0a0f18" stroke="#223244"/>
+    <text x="253" y="397" font-size="18" fill="#e3eaf2">38&#176;C</text>
+    <rect x="42" y="420" width="130" height="40" rx="10" fill="#0a0f18" stroke="#223244"/>
+    <text x="107" y="447" font-size="18" fill="#e3eaf2">1 250 W</text>
+    <rect x="188" y="420" width="130" height="40" rx="10" fill="#0a0f18" stroke="#223244"/>
+    <text x="253" y="447" font-size="18" fill="#e3eaf2">Load 62%</text>
+  </g>
+
+  <rect x="30" y="480" width="300" height="44" rx="10" fill="#0a0f18" stroke="#223244"/>
+  <text x="180" y="508" font-family="sans-serif" font-size="15" fill="#92a3b4" text-anchor="middle">Trip A 15.2 km &#183; Trip B 127.8 km &#183; Trip C 1 450.3 km</text>
+
+  <rect x="0" y="590" width="360" height="48" fill="#16222f" stroke="#223244"/>
+  <text x="180" y="620" font-family="sans-serif" font-size="13" fill="#92a3b4" text-anchor="middle">Car display: wired &amp; wireless Android Auto</text>
+  <text x="180" y="700" font-family="sans-serif" font-size="13" fill="#92a3b4" text-anchor="middle">Glance-optimised &#8212; read-only by design</text>
+</svg>

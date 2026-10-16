@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GitHub — EUC OsmAnd Plugin source, builds, and releases</title>
+  <meta name="description" content="EUC OsmAnd Plugin on GitHub: browse the source, build the Android app from scratch (SDK 35, JDK 17), and see how releases are cut.">
+  <link rel="icon" href="images/icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="site-head">
+  <div class="wrap head-row">
+    <a class="brand" href="index.html" aria-label="EUC OsmAnd Plugin home">
+      <img class="brand-mark" src="images/icon.png" alt="" width="30" height="30">
+      <span class="brand-name">EUC OsmAnd Plugin</span>
+    </a>
+    <nav class="head-nav" aria-label="Main">
+      <a href="index.html">App</a>
+      <a href="widgets.html">Widgets</a>
+      <a href="auto.html">Android Auto</a>
+      <a href="github.html" aria-current="page">GitHub</a>
+      <a href="privacy.html">Privacy</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="wrap page-hero">
+    <span class="eyebrow">GitHub project</span>
+    <h1>Read it. Build it. Change it.</h1>
+    <p class="lede">The entire Android app lives at
+    <a href="https://github.com/githuba42r/OSM-EUC-World">github.com/githuba42r/OSM-EUC-World</a>
+    — no closed components: what you install is what's in the repo.</p>
+    <div class="cta-row">
+      <a class="btn" href="https://github.com/githuba42r/OSM-EUC-World/releases/latest">Download the latest release</a>
+      <a class="btn btn-ghost" href="https://github.com/githuba42r/OSM-EUC-World">View the repository</a>
+      <a class="btn btn-ghost" href="#build">Build from source</a>
+    </div>
+  </section>
+
+  <section class="wrap page-body">
+    <div class="feature-list two-col">
+      <article class="card">
+        <h3>Full source, one repo</h3>
+        <p>Kotlin app — OsmAnd widget plugin, the Android Auto Car App Service,
+        home screen widget, trip meter persistence, and the release tooling, all
+        in one tree with tests and CI.</p>
+      </article>
+      <article class="card">
+        <h3>Reproducible releases</h3>
+        <p><code>./release.sh patch|minor|major</code> bumps
+        <code>version.properties</code> (semver + version code), tags the
+        release, and builds the signed artifact. GitHub Actions publishes the
+        signed APK for every <code>v*</code> tag.</p>
+      </article>
+      <article class="card">
+        <h3>Issues &amp; contributions</h3>
+        <p>Found a widget that behaves oddly, or a surface you'd like the wheel
+        data on? Open an issue or a pull request on GitHub.</p>
+      </article>
+      <article class="card">
+        <h3>Built on open foundations</h3>
+        <p>Maps and widgets run on <a href="https://osmand.net">OsmAnd</a>;
+        wheel data comes from <a href="https://euc.world">EUC World</a>. Grateful
+        for both — and for the phone-mount hacks that got us here.</p>
+      </article>
+    </div>
+
+    <div class="note">
+      <p><strong>Current releases:</strong> signed APKs are on the
+      <a href="https://github.com/githuba42r/OSM-EUC-World/releases/latest">latest release</a>
+      page, published automatically by GitHub Actions on every release tag.
+      Google Play distribution is handled separately.</p>
+    </div>
+
+    <h2 id="build">Build from source</h2>
+    <p>Prerequisites:</p>
+    <ul>
+      <li>Android Studio (JDK 17 toolchain)</li>
+      <li>Android SDK 35</li>
+      <li>Gradle 8.9+</li>
+    </ul>
+
+    <p>Clone, open in Android Studio, sync, and build:</p>
+    <div class="code-block">git clone https://github.com/githuba42r/OSM-EUC-World.git
+cd OSM-EUC-World
+
+./gradlew assembleDebug     # build the APK
+./gradlew test              # unit tests</div>
+
+    <p>Signing credentials are read from an untracked
+    <code>keystore.properties</code> at the repo root
+    (<code>storeFile</code>, <code>storePassword</code>, <code>keyAlias</code>,
+    <code>keyPassword</code>); without it, debug builds work normally.</p>
+
+    <p>Releases are cut with the release script, which keeps everything in
+    lock-step:</p>
+    <div class="code-block">./release.sh patch            # e.g. 1.1.17 -> 1.1.18
+./release.sh minor            # 1.1.17 -> 1.2.0
+./release.sh major            # 1.1.17 -> 2.0.0
+./release.sh minor --pre-release</div>
+
+    <p>The script verifies a clean working tree, updates
+    <code>version.properties</code>, commits and tags
+    <code>v&lt;version&gt;</code>. Pushing the tag is what fires the GitHub
+    Actions release workflow, which restores signing material from repository
+    secrets, builds the signed APK, and publishes it on the GitHub Release:</p>
+    <div class="code-block">git push && git push --tags</div>
+
+    <h2>Project layout</h2>
+    <div class="code-block">app/src/main/java/com/a42r/eucosmandplugin/
+├── api/            # EUC World internal-webservice client
+├── service/        # Foreground service polling the wheel data
+├── widget/         # Home screen widget
+├── auto/           # Android Auto Car App Service &amp; HUD screens
+├── range/          # Practical-range estimation
+├── ai/             # (feature-flagged) AI range estimation
+└── ui/             # Main phone app screens &amp; trip meters
+.github/workflows/release.yml           # signed APK release pipeline
+.github/workflows/deploy-website.yml    # this project site → Oracle Cloud</div>
+
+    <div class="cta-row">
+      <a class="btn" href="https://github.com/githuba42r/OSM-EUC-World">Go to the repository</a>
+      <a class="btn btn-ghost" href="https://github.com/githuba42r/OSM-EUC-World/issues">Open an issue</a>
+    </div>
+  </section>
+</main>
+
+<footer class="site-foot">
+  <div class="wrap foot-row">
+    <span>EUC OsmAnd Plugin — EUC World data, on the map, in the car, on the home screen.</span>
+    <nav aria-label="Footer">
+      <a href="https://github.com/githuba42r/OSM-EUC-World/releases/latest">Releases</a>
+      <a href="github.html" aria-current="page">GitHub</a>
+      <a href="privacy.html">Privacy</a>
+    </nav>
+  </div>
+</footer>
+
+</body>
+</html>

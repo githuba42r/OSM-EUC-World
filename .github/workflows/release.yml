@@ -1,0 +1,118 @@
+name: Release
+
+# Builds the signed release APK and publishes a GitHub Release for sideloading.
+# Google Play publishing (AAB upload) stays local via release.sh /
+# gradle publishReleaseBundle and is not handled here.
+#
+# Triggers:
+#   - push of a tag matching v* (normal flow: ./release.sh && git push --tags)
+#   - manual dispatch, optionally with an existing tag to (re)release
+#
+# Required repository secrets:
+#   ANDROID_KEYSTORE_B64           base64 of app/release-key.jks
+#   ANDROID_KEYSTORE_PASSWORD      keystore password
+#   ANDROID_KEY_ALIAS              key alias (osmand-euc-world-release-key)
+#   ANDROID_KEY_PASSWORD           key password
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing git tag to build & release (e.g. v1.1.17). Leave empty to build without publishing."
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || github.event.inputs.tag }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Verify release secrets are configured
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          missing=""
+          if [ -z "$KS_B64" ]; then missing="$missing ANDROID_KEYSTORE_B64"; fi
+          if [ -z "$KS_PASS" ]; then missing="$missing ANDROID_KEYSTORE_PASSWORD"; fi
+          if [ -z "$KEY_ALIAS" ]; then missing="$missing ANDROID_KEY_ALIAS"; fi
+          if [ -z "$KEY_PASS" ]; then missing="$missing ANDROID_KEY_PASSWORD"; fi
+          if [ -n "$missing" ]; then
+            echo "::error::Missing GitHub Actions secrets:$missing"
+            exit 1
+          fi
+
+      - name: Restore signing material
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$KS_B64" | base64 -d > app/release-key.jks
+          printf 'storeFile=release-key.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+            "$KS_PASS" "$KEY_ALIAS" "$KEY_PASS" > keystore.properties
+
+      - name: Build release APK
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Collect artifacts
+        run: |
+          if [ ! -f app/build/outputs/apk/release/app-release.apk ]; then
+            echo "::error::Signed APK not found — output was unsigned (signing config not applied?)"
+            find app/build/outputs -type f -name '*.apk' -o -name '*.aab' || true
+            exit 1
+          fi
+          if [ -f app/build/outputs/apk/release/app-release-unsigned.apk ]; then
+            echo "::error::APK build produced an unsigned artifact"
+            exit 1
+          fi
+          TAG="${RELEASE_TAG:-build}"
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release.apk "dist/EUCOsmAndPlugin-${TAG}.apk"
+          ls -l dist/
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: euosmandplugin-${{ env.RELEASE_TAG || 'build' }}
+          path: dist/
+
+      - name: Create GitHub release
+        if: env.RELEASE_TAG != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+              --title "$RELEASE_TAG" --generate-notes --verify-tag
+          fi
+          gh release upload "$RELEASE_TAG" dist/* --repo "$GITHUB_REPOSITORY" --clobber

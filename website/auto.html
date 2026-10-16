@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Android Auto — the EUC HUD on your car display</title>
+  <meta name="description" content="EUC OsmAnd Plugin on Android Auto: a read-only, glance-optimised HUD showing battery, voltage, speed, temperature, power and load on the car's display, wired or wireless.">
+  <link rel="icon" href="images/icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="site-head">
+  <div class="wrap head-row">
+    <a class="brand" href="index.html" aria-label="EUC OsmAnd Plugin home">
+      <img class="brand-mark" src="images/icon.png" alt="" width="30" height="30">
+      <span class="brand-name">EUC OsmAnd Plugin</span>
+    </a>
+    <nav class="head-nav" aria-label="Main">
+      <a href="index.html">App</a>
+      <a href="widgets.html">Widgets</a>
+      <a href="auto.html" aria-current="page">Android Auto</a>
+      <a href="github.html">GitHub</a>
+      <a href="privacy.html">Privacy</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="wrap page-hero">
+    <span class="eyebrow">Android Auto integration</span>
+    <h1>The wheel's HUD, on the car screen.</h1>
+    <p class="lede">Connect the phone to Android Auto and the plugin appears in
+    the car's app launcher. Open it for a large, driver-focused display of
+    everything the wheel reports — designed to be seen in a glance, and to show
+    nothing that invites interaction while driving.</p>
+  </section>
+
+  <section class="wrap page-body">
+    <div class="shot-row" style="max-width: 300px;">
+      <figure class="frame phone">
+        <img src="images/auto-hud.svg" alt="Mockup of the Android Auto HUD display with battery, voltage and live metrics.">
+        <figcaption>Mockup — the in-car HUD</figcaption>
+      </figure>
+    </div>
+
+    <h2>What the car display shows</h2>
+    <div class="feature-grid">
+      <article class="card">
+        <h3>Large HUD-style readout</h3>
+        <p>Battery percentage and voltage rendered big, so the state of the
+        wheel is readable from the driver's seat.</p>
+      </article>
+      <article class="card">
+        <h3>Live metrics</h3>
+        <p>Speed, temperature, power draw and wheel load, updating in real
+        time from the EUC World service.</p>
+      </article>
+      <article class="card">
+        <h3>Connection status &amp; wheel model</h3>
+        <p>&ldquo;Connected — InMotion V12&rdquo;-style status line, so you know
+        data is flowing.</p>
+      </article>
+      <article class="card">
+        <h3>Read-only by design</h3>
+        <p>The Auto interface is built for minimal driver distraction: it
+        displays the wheel, it doesn't ask anything of the driver.</p>
+      </article>
+    </div>
+
+    <h2>Connecting</h2>
+    <ol class="step-list">
+      <li>Connect your phone to the car — wired or wireless Android Auto both
+      work, on built-in displays and aftermarket head units.</li>
+      <li>In Android Auto's app launcher, open the EUC World plugin entry.</li>
+      <li>The HUD appears with battery, voltage, speed and temperature as soon
+      as the background service is talking to the wheel.</li>
+    </ol>
+
+    <div class="note">
+      <p><strong>Before you drive:</strong> start the plugin on the phone first
+      (it runs as a foreground service and keeps running with the screen off),
+      so the car display has live data the moment you open it.</p>
+    </div>
+
+    <div class="cta-row">
+      <a class="btn" href="https://github.com/githuba42r/OSM-EUC-World/releases/latest">Get the app</a>
+      <a class="btn btn-ghost" href="index.html">Back to the app</a>
+    </div>
+  </section>
+</main>
+
+<footer class="site-foot">
+  <div class="wrap foot-row">
+    <span>EUC OsmAnd Plugin — EUC World data, on the map, in the car, on the home screen.</span>
+    <nav aria-label="Footer">
+      <a href="https://github.com/githuba42r/OSM-EUC-World/releases/latest">Releases</a>
+      <a href="github.html">GitHub</a>
+      <a href="privacy.html">Privacy</a>
+    </nav>
+  </div>
+</footer>
+
+</body>
+</html>
