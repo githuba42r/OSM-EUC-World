@@ -28,12 +28,12 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace 'com.a42r.eucosmandplugin'
-    compileSdk 35
+    compileSdk 36
 
     defaultConfig {
         applicationId "com.a42r.eucosmandplugin"
         minSdk 26
-        targetSdk 35
+        targetSdk 36
         versionCode versionCodeNum
         versionName appVersionName
 
