@@ -13,6 +13,7 @@ import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -54,6 +55,7 @@ class EucWorldService : LifecycleService() {
         const val EXTRA_EUC_DATA = "euc_data"
         
         private const val DEFAULT_POLL_INTERVAL_MS = 500L
+        private const val DEFAULT_IDLE_HIDE_TIMEOUT_MS = 60_000L
         private const val PREF_HIDE_NOTIFICATION = "hide_notification"
         private const val PREF_NOTIFY_ONLY_WHEN_CONNECTED = "notify_only_when_connected"
         
@@ -100,6 +102,21 @@ class EucWorldService : LifecycleService() {
     // ID does not reliably move the notification to the new channel on all
     // OEM skins (e.g. Samsung One UI).
     private var notificationIsMinimal: Boolean? = null
+    
+    // True while the service currently holds foreground status. When the wheel
+    // disconnects for longer than the idle timeout the service DEMOTES itself
+    // to a plain background service (stopForeground + cancel): Android floors
+    // foreground-service notifications at IMPORTANCE_LOW and never honours
+    // IMPORTANCE_MIN, so the only way to make the drawer entry disappear is
+    // to stop being foreground. Polling continues so the wheel reconnect is
+    // still detected and the service promotes back to foreground+notification.
+    private var isForeground = false
+    
+    // lastConnectedElapsedMs == 0 means "never connected during this run";
+    // the service start time (captured below) is the idle anchor instead.
+    private var lastConnectedElapsedMs = 0L
+    private var serviceStartElapsedMs = 0L
+    private var idleHideTimeoutMs = DEFAULT_IDLE_HIDE_TIMEOUT_MS
     
     // Flag to indicate if service is being redirected to mock mode
     private var redirectingToMockMode = false
@@ -174,6 +191,10 @@ class EucWorldService : LifecycleService() {
         
         // Normal initialization continues...
         
+        // Capture the service start time so idle timeouts work even when the
+        // wheel never connected during this run.
+        serviceStartElapsedMs = SystemClock.elapsedRealtime()
+        
         // Acquire wake lock for continuous background operation
         // This prevents the CPU from sleeping and ensures continuous data sampling
         acquireWakeLock()
@@ -219,11 +240,12 @@ class EucWorldService : LifecycleService() {
             return START_NOT_STICKY
         }
         
-        when (intent?.action ?: ACTION_START) {
+        when (intent?.action) {
             ACTION_START -> {
                 val notification = createNotification()
                 notificationIsMinimal = notification.channelId == NOTIFICATION_CHANNEL_ID_MINIMAL
                 startForeground(NOTIFICATION_ID, notification)
+                isForeground = true
                 startPolling()
                 
                 // Connect to OsmAnd AIDL service
@@ -233,8 +255,16 @@ class EucWorldService : LifecycleService() {
                 stopPolling()
                 osmAndHelper.disconnect()
                 notificationIsMinimal = null
+                isForeground = false
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
+            }
+            // Sticky restart after a process kill: resume polling without
+            // re-establishing foreground. If the wheel is (or becomes)
+            // connected, promoteToForeground() will restore the notification.
+            null -> {
+                serviceStartElapsedMs = SystemClock.elapsedRealtime()
+                startPolling()
             }
         }
         
@@ -261,6 +291,7 @@ class EucWorldService : LifecycleService() {
             ?: EucWorldApiClient.DEFAULT_BASE_URL
         val port = prefs.getInt("api_port", EucWorldApiClient.DEFAULT_PORT)
         val disconnectTimeout = defaultPrefs.getInt("wheel_disconnect_timeout", EucWorldApiClient.DEFAULT_DISCONNECT_TIMEOUT_SECONDS)
+        idleHideTimeoutMs = maxOf(DEFAULT_IDLE_HIDE_TIMEOUT_MS, disconnectTimeout * 1000L)
         pollIntervalMs = prefs.getLong("poll_interval", DEFAULT_POLL_INTERVAL_MS)
         
         apiClient = EucWorldApiClient(baseUrl, port, disconnectTimeout)
@@ -284,7 +315,7 @@ class EucWorldService : LifecycleService() {
                         osmAndHelper.clearWidgets()
                     }
                     
-                    updateNotificationDisconnected()
+                    onConnectionLost()
                 }
                 .collectLatest { result ->
                     result.fold(
@@ -298,7 +329,12 @@ class EucWorldService : LifecycleService() {
                             }
                             
                             // Update notification with current data
-                            updateNotification(data)
+                            if (data.isConnected) {
+                                promoteToForeground(data)
+                            } else {
+                                demoteIfIdle()
+                                if (isForeground) postNotification(createNotification(data))
+                            }
                             
                             // Update range estimation
                             updateRangeEstimation(data)
@@ -316,7 +352,7 @@ class EucWorldService : LifecycleService() {
                                 osmAndHelper.clearWidgets()
                             }
                             
-                            updateNotificationDisconnected()
+                            onConnectionLost()
                         }
                     )
                 }
@@ -547,6 +583,55 @@ class EucWorldService : LifecycleService() {
         }
         notificationIsMinimal = minimal
         notificationManager.notify(NOTIFICATION_ID, notification)
+    }
+    
+    /**
+     * Ensure the service holds foreground status and shows the wheel's live
+     * notification. Promotes (startForeground) or re-posts depending on the
+     * current state.
+     */
+    private fun promoteToForeground(data: EucData) {
+        lastConnectedElapsedMs = SystemClock.elapsedRealtime()
+        val notification = createNotification(data)
+        if (isForeground) {
+            postNotification(notification)
+        } else {
+            notificationIsMinimal = notification.channelId == NOTIFICATION_CHANNEL_ID_MINIMAL
+            startForeground(NOTIFICATION_ID, notification)
+            isForeground = true
+            acquireWakeLock()
+            Log.d(TAG, "Wheel connected — promoted to foreground, notification visible")
+        }
+    }
+    
+    /**
+     * Called when a poll succeeds but the wheel is not connected. If the wheel
+     * has been away for longer than the idle timeout the foreground status is
+     * dropped (drawer entry disappears) while polling continues in the
+     * background.
+     */
+    private fun demoteIfIdle() {
+        if (!isForeground) return
+        val anchor = if (lastConnectedElapsedMs > 0) lastConnectedElapsedMs else serviceStartElapsedMs
+        if (SystemClock.elapsedRealtime() - anchor < idleHideTimeoutMs) return
+        
+        val notificationManager = getSystemService(NotificationManager::class.java)
+        notificationIsMinimal = null
+        notificationManager.cancel(NOTIFICATION_ID)
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        isForeground = false
+        releaseWakeLock()
+        Log.d(TAG, "Wheel not connected for ${idleHideTimeoutMs}ms — demoted to background; polling continues, notification hidden")
+    }
+    
+    /**
+     * Called when the poll fails entirely (EUC World not running, HTTP
+     * error...). Behaves like disconnection: keeps the "waiting" notification
+     * briefly, then disappears past the idle timeout.
+     */
+    private fun onConnectionLost() {
+        demoteIfIdle()
+        if (isForeground) postNotification(createNotification(null))
     }
     
     /**
