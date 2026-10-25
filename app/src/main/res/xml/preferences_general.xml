@@ -16,4 +16,11 @@
         android:defaultValue="false"
         app:iconSpaceReserved="false" />
 
+    <SwitchPreferenceCompat
+        android:key="notify_only_when_connected"
+        android:title="@string/settings_notify_only_when_connected"
+        android:summary="@string/settings_notify_only_when_connected_summary"
+        android:defaultValue="false"
+        app:iconSpaceReserved="false" />
+
 </PreferenceScreen>

@@ -55,6 +55,7 @@ class EucWorldService : LifecycleService() {
         
         private const val DEFAULT_POLL_INTERVAL_MS = 500L
         private const val PREF_HIDE_NOTIFICATION = "hide_notification"
+        private const val PREF_NOTIFY_ONLY_WHEN_CONNECTED = "notify_only_when_connected"
         
         // Static reference to latest data for widgets
         @Volatile
@@ -270,6 +271,8 @@ class EucWorldService : LifecycleService() {
                     if (osmAndHelper.isConnected()) {
                         osmAndHelper.clearWidgets()
                     }
+                    
+                    updateNotificationDisconnected()
                 }
                 .collectLatest { result ->
                     result.fold(
@@ -300,6 +303,8 @@ class EucWorldService : LifecycleService() {
                             if (osmAndHelper.isConnected()) {
                                 osmAndHelper.clearWidgets()
                             }
+                            
+                            updateNotificationDisconnected()
                         }
                     )
                 }
@@ -445,6 +450,8 @@ class EucWorldService : LifecycleService() {
     private fun createNotification(data: EucData? = null): Notification {
         val prefs = PreferenceManager.getDefaultSharedPreferences(this)
         val hideNotification = prefs.getBoolean(PREF_HIDE_NOTIFICATION, false)
+        val notifyOnlyWhenConnected = prefs.getBoolean(PREF_NOTIFY_ONLY_WHEN_CONNECTED, false)
+        val connected = data != null && data.isConnected
         
         val contentIntent = PendingIntent.getActivity(
             this,
@@ -460,10 +467,18 @@ class EucWorldService : LifecycleService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         
-        // Choose channel based on preference
-        val channelId = if (hideNotification) NOTIFICATION_CHANNEL_ID_MINIMAL else NOTIFICATION_CHANNEL_ID
+        // Android requires a notification while the foreground service is running,
+        // so to make the notification effectively invisible while no wheel is
+        // detected we collapse it to the minimal channel (IMPORTANCE_MIN):
+        // hidden from the status bar and tucked away at the bottom of the shade.
+        // It is promoted back to the standard channel, with live wheel data, as
+        // soon as the wheel connects.
+        val useMinimal = hideNotification || (notifyOnlyWhenConnected && !connected)
         
-        return if (hideNotification) {
+        // Choose channel based on preference and connection state
+        val channelId = if (useMinimal) NOTIFICATION_CHANNEL_ID_MINIMAL else NOTIFICATION_CHANNEL_ID
+        
+        return if (useMinimal) {
             // Minimal notification - just shows in notification shade, not status bar
             NotificationCompat.Builder(this, channelId)
                 .setContentTitle(getString(R.string.app_name))
@@ -477,8 +492,8 @@ class EucWorldService : LifecycleService() {
                 .build()
         } else {
             // Standard notification with EUC data
-            val contentText = if (data != null && data.isConnected) {
-                data.getBatteryDisplayString()
+            val contentText = if (connected) {
+                data!!.getBatteryDisplayString()
             } else {
                 getString(R.string.waiting_for_connection)
             }
@@ -498,6 +513,15 @@ class EucWorldService : LifecycleService() {
     private fun updateNotification(data: EucData) {
         val notificationManager = getSystemService(NotificationManager::class.java)
         notificationManager.notify(NOTIFICATION_ID, createNotification(data))
+    }
+    
+    /**
+     * Re-post the notification as "disconnected" (collapsed to the minimal
+     * channel when 'notify only when connected' is enabled).
+     */
+    private fun updateNotificationDisconnected() {
+        val notificationManager = getSystemService(NotificationManager::class.java)
+        notificationManager.notify(NOTIFICATION_ID, createNotification(null))
     }
     
     /**

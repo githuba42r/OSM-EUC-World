@@ -47,6 +47,11 @@ class GeneralSettingsActivity : AppCompatActivity() {
                 setDefaultValue(false)
             }
             
+            // Only show notification when connected preference
+            findPreference<SwitchPreferenceCompat>("notify_only_when_connected")?.apply {
+                setDefaultValue(false)
+            }
+            
             // Auto-start on boot preference
             findPreference<SwitchPreferenceCompat>("auto_start_on_boot")?.apply {
                 setDefaultValue(false)

@@ -70,6 +70,8 @@
     <string name="settings_auto_start_summary">Start the service automatically when device boots</string>
     <string name="settings_hide_notification">Hide notification icon</string>
     <string name="settings_hide_notification_summary">Hide notification icon from status bar (notification still visible in notification shade)</string>
+    <string name="settings_notify_only_when_connected">Only Show Notification When Connected</string>
+    <string name="settings_notify_only_when_connected_summary">Hide the notification from the notification drawer unless a wheel is connected</string>
     <string name="settings_category_display">Display</string>
     <string name="settings_use_metric">Use Metric Units</string>
     <string name="settings_use_metric_summary">Display speed in km/h and temperature in Celsius</string>
