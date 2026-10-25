@@ -94,6 +94,13 @@ class EucWorldService : LifecycleService() {
     
     private var pollIntervalMs = DEFAULT_POLL_INTERVAL_MS
     
+    // Tracks whether the currently posted foreground notification is the
+    // minimal (hidden) variant. When the variant changes we must cancel() and
+    // re-post: re-posting the same notification ID with a different channel
+    // ID does not reliably move the notification to the new channel on all
+    // OEM skins (e.g. Samsung One UI).
+    private var notificationIsMinimal: Boolean? = null
+    
     // Flag to indicate if service is being redirected to mock mode
     private var redirectingToMockMode = false
     
@@ -152,7 +159,9 @@ class EucWorldService : LifecycleService() {
             // IMPORTANT: Must call startForeground() before stopping, even when redirecting
             // Otherwise Android will crash with ForegroundServiceDidNotStartInTimeException
             createNotificationChannel()
-            startForeground(NOTIFICATION_ID, createNotification())
+            val notification = createNotification()
+            notificationIsMinimal = notification.channelId == NOTIFICATION_CHANNEL_ID_MINIMAL
+            startForeground(NOTIFICATION_ID, notification)
             
             // Start mock service instead
             MockEucDataService.start(this)
@@ -210,9 +219,11 @@ class EucWorldService : LifecycleService() {
             return START_NOT_STICKY
         }
         
-        when (intent?.action) {
+        when (intent?.action ?: ACTION_START) {
             ACTION_START -> {
-                startForeground(NOTIFICATION_ID, createNotification())
+                val notification = createNotification()
+                notificationIsMinimal = notification.channelId == NOTIFICATION_CHANNEL_ID_MINIMAL
+                startForeground(NOTIFICATION_ID, notification)
                 startPolling()
                 
                 // Connect to OsmAnd AIDL service
@@ -221,6 +232,7 @@ class EucWorldService : LifecycleService() {
             ACTION_STOP -> {
                 stopPolling()
                 osmAndHelper.disconnect()
+                notificationIsMinimal = null
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
@@ -511,8 +523,7 @@ class EucWorldService : LifecycleService() {
     }
     
     private fun updateNotification(data: EucData) {
-        val notificationManager = getSystemService(NotificationManager::class.java)
-        notificationManager.notify(NOTIFICATION_ID, createNotification(data))
+        postNotification(createNotification(data))
     }
     
     /**
@@ -520,8 +531,22 @@ class EucWorldService : LifecycleService() {
      * channel when 'notify only when connected' is enabled).
      */
     private fun updateNotificationDisconnected() {
+        postNotification(createNotification(null))
+    }
+    
+    /**
+     * Post (or update) the foreground service notification. Cancels the
+     * existing notification first when switching between the standard and
+     * minimal channels, so the channel change actually takes effect.
+     */
+    private fun postNotification(notification: Notification) {
         val notificationManager = getSystemService(NotificationManager::class.java)
-        notificationManager.notify(NOTIFICATION_ID, createNotification(null))
+        val minimal = notification.channelId == NOTIFICATION_CHANNEL_ID_MINIMAL
+        if (notificationIsMinimal != null && notificationIsMinimal != minimal) {
+            notificationManager.cancel(NOTIFICATION_ID)
+        }
+        notificationIsMinimal = minimal
+        notificationManager.notify(NOTIFICATION_ID, notification)
     }
     
     /**
