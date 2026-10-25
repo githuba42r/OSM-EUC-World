@@ -1,11 +1,12 @@
 name: Release
 
-# Builds the signed release APK and publishes a GitHub Release for sideloading.
-# Google Play publishing (AAB upload) stays local via release.sh /
-# gradle publishReleaseBundle and is not handled here.
+# Builds the signed release APK + AAB, publishes a GitHub Release (APK, for
+# sideloading), and uploads the AAB to Google Play internal testing
+# (Play only accepts AABs). A success email is sent when all SMTP secrets
+# are configured.
 #
 # Triggers:
-#   - push of a tag matching v* (normal flow: ./release.sh && git push --tags)
+#   - push of a tag matching v* (normal flow: bump version, tag, push)
 #   - manual dispatch, optionally with an existing tag to (re)release
 #
 # Required repository secrets:
@@ -13,6 +14,15 @@ name: Release
 #   ANDROID_KEYSTORE_PASSWORD      keystore password
 #   ANDROID_KEY_ALIAS              key alias (osmand-euc-world-release-key)
 #   ANDROID_KEY_PASSWORD           key password
+#
+# Google Play upload (skipped with a warning when the secret is absent):
+#   PLAY_SERVICE_ACCOUNT_JSON      contents of play-service-account.json
+# Optional repository variables:
+#   PLAY_TRACK                     internal (default) | alpha | beta | production
+#   PLAY_RELEASE_STATUS            completed (default) | draft
+#
+# Email notification (skipped with a warning when any of these is absent):
+#   RELEASE_NOTIFY_EMAIL / SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS / SMTP_FROM
 
 on:
   push:
@@ -82,8 +92,8 @@ jobs:
           printf 'storeFile=release-key.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
             "$KS_PASS" "$KEY_ALIAS" "$KEY_PASS" > keystore.properties
 
-      - name: Build release APK
-        run: ./gradlew --no-daemon assembleRelease
+      - name: Build release APK and AAB
+        run: ./gradlew --no-daemon assembleRelease bundleRelease
 
       - name: Collect artifacts
         run: |
@@ -96,16 +106,24 @@ jobs:
             echo "::error::APK build produced an unsigned artifact"
             exit 1
           fi
+          if [ ! -f app/build/outputs/bundle/release/app-release.aab ]; then
+            echo "::error::Release AAB not found"
+            exit 1
+          fi
           TAG="${RELEASE_TAG:-build}"
-          mkdir -p dist
+          mkdir -p dist play
           cp app/build/outputs/apk/release/app-release.apk "dist/EUCOsmAndPlugin-${TAG}.apk"
-          ls -l dist/
+          # AAB kept out of dist/ so it isn't attached to the GitHub release
+          cp app/build/outputs/bundle/release/app-release.aab "play/EUCOsmAndPlugin-${TAG}.aab"
+          ls -l dist/ play/
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: euosmandplugin-${{ env.RELEASE_TAG || 'build' }}
-          path: dist/
+          path: |
+            dist/
+            play/
 
       - name: Create GitHub release
         if: env.RELEASE_TAG != ''
@@ -118,6 +136,60 @@ jobs:
           fi
           gh release upload "$RELEASE_TAG" dist/* --repo "$GITHUB_REPOSITORY" --clobber
 
+      - name: Generate Play release notes
+        if: env.RELEASE_TAG != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # whatsNewDirectory requires files named whatsnew-<BCP47-locale>.
+          # List the commits since the previous release through the API; fall
+          # back to the generated release body, then a one-line placeholder.
+          # Play caps notes at 500 characters.
+          mkdir -p dist/whatsnew
+          notes=""
+          prev=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=20" \
+            --jq '.[].tag_name' | grep -vx "$RELEASE_TAG" | head -1)
+          if [ -n "$prev" ]; then
+            notes=$(gh api "repos/$GITHUB_REPOSITORY/compare/$prev...$RELEASE_TAG" \
+              --jq '.commits[] | "• " + (.commit.message | split("\n")[0])' 2>/dev/null || true)
+          fi
+          if [ -z "$notes" ]; then
+            notes=$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json body -q .body 2>/dev/null \
+              | grep -vE '^[[:space:]]*#' | sed 's/\*\*//g; s/[[:space:]]*$//' | awk 'NF' || true)
+          fi
+          if [ -z "$notes" ]; then
+            notes="New in $RELEASE_TAG"
+          fi
+          printf 'New in %s:\n\n%s\n' "$RELEASE_TAG" "$notes" | head -c 500 \
+            > dist/whatsnew/whatsnew-en-US
+          echo "whatsnew-en-US:"
+          cat dist/whatsnew/whatsnew-en-US
+
+      - name: Check Play upload credentials
+        id: play
+        if: env.RELEASE_TAG != ''
+        env:
+          PLAY_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$PLAY_JSON" ]; then
+            echo "::warning::PLAY_SERVICE_ACCOUNT_JSON not set — skipping Google Play upload"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload AAB to Google Play
+        if: steps.play.outputs.enabled == 'true'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.a42r.eucosmandplugin
+          releaseFiles: play/*.aab
+          releaseName: ${{ env.RELEASE_TAG }}
+          tracks: ${{ vars.PLAY_TRACK || 'internal' }}
+          status: ${{ vars.PLAY_RELEASE_STATUS || 'completed' }}
+          whatsNewDirectory: dist/whatsnew
+
       - name: Send success email
         if: env.RELEASE_TAG != '' && env.NOTIFY_ENABLED == 'true'
         uses: dawidd6/action-send-mail@v3
@@ -128,11 +200,13 @@ jobs:
           password: ${{ secrets.SMTP_PASS }}
           from: "GitHub Actions <${{ secrets.SMTP_FROM }}>"
           to: ${{ secrets.RELEASE_NOTIFY_EMAIL }}
-          subject: "[OSM EUC World] ${{ env.RELEASE_TAG }} built & released"
+          subject: "[OSM EUC World] ${{ env.RELEASE_TAG }} built & released to Play internal testing"
           html_body: |
             <h2>OSM EUC World — release ${{ env.RELEASE_TAG }} is built and published</h2>
             <p>The signed release APK for tag <b>${{ env.RELEASE_TAG }}</b> was built, uploaded as an artifact
             and attached to a <b>GitHub Release</b> (sideload distribution).</p>
+            <p>The release AAB was uploaded to <b>Google Play internal testing track</b> as
+            ${{ vars.PLAY_RELEASE_STATUS || 'completed' }}.</p>
             <p><u>Links</u></p>
             <ul>
               <li><b>GitHub Release</b> (download APK / release notes):
